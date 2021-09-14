@@ -1,0 +1,27 @@
+0 silly argv {
+0 silly argv   _: [ 'clean' ],
+0 silly argv   lernaVersion: '4.0.0',
+0 silly argv   '$0': '/opt/homebrew/bin/lerna'
+0 silly argv }
+1 notice cli v4.0.0
+2 verbose rootPath /Users/tylerling/Documents/Projects/gilatod
+3 info Removing the following directories:
+4 info clean packages/fengari-loader/node_modules
+4 info clean packages/gilatod-app-metaverse/node_modules
+4 info clean packages/gilatod-meido/node_modules
+4 info clean packages/gilatod-space/node_modules
+4 info clean packages/gilatod-webpack-assets/node_modules
+5 info clean removing /Users/tylerling/Documents/Projects/gilatod/packages/fengari-loader/node_modules
+6 silly rimrafDir /Users/tylerling/Documents/Projects/gilatod/packages/fengari-loader/node_modules
+7 info clean removing /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-app-metaverse/node_modules
+8 silly rimrafDir /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-app-metaverse/node_modules
+9 info clean removing /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-meido/node_modules
+10 silly rimrafDir /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-meido/node_modules
+11 info clean removing /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-space/node_modules
+12 silly rimrafDir /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-space/node_modules
+13 info clean removing /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-webpack-assets/node_modules
+14 silly rimrafDir /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-webpack-assets/node_modules
+15 error Error: Command failed with exit code 1: /opt/homebrew/Cellar/node/16.9.1/bin/node /Users/tylerling/Documents/Projects/gilatod/node_modules/rimraf/bin.js --no-glob /Users/tylerling/Documents/Projects/gilatod/packages/gilatod-app-metaverse/node_modules/
+15 error     at makeError (/Users/tylerling/Documents/Projects/gilatod/node_modules/execa/lib/error.js:60:11)
+15 error     at handlePromise (/Users/tylerling/Documents/Projects/gilatod/node_modules/execa/index.js:118:26)
+15 error     at processTicksAndRejections (node:internal/process/task_queues:96:5)

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        * { padding: 0; margin: 0; }
+        body {
+            background-color: #000;
+            overflow: hidden;
+        } 
+        html, body{
+            position:fixed;
+            top:0;
+            left:0;
+            right:0;
+            bottom:0;
+        }
+    </style>
+</head>
+<body class="hide-overflow">
+    <div class="font_preload" style="opacity: 0">
+        <span style="font-family: 'Snell Roundhand';"></span>
+    </div>
+    <script>
+        window.onload = function () {
+            document.addEventListener('gesturestart', function (e) {
+                e.preventDefault();
+            });
+            document.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+            });
+            document.addEventListener('touchstart', function (event) {
+                if (event.touches.length > 1) {
+                    event.preventDefault();
+                }
+            });
+            var lastTouchEnd = 0;
+            document.addEventListener('touchend', function (event) {
+                var now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    event.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+        };
+    </script>
+</body>
+</html>

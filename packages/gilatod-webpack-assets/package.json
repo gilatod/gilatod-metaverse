@@ -1,0 +1,10 @@
+{
+    "name": "gilatod-webpack-assets",
+    "description": "Asset loader for Webpack environment",
+    "authors": "Phlam Sicusa",
+    "version": "1.0.0",
+    "main": "src/assets.lua",
+    "dependencies": {
+        "gilatod-meido": "^1.0.0"
+    }
+}
