@@ -1,7 +1,7 @@
-local guard = require("guard")
-local array = require("array")
-local event = require("event")
-local async = require("async")
+local guard = require("meido.guard")
+local array = require("meido.array")
+local event = require("meido.event")
+local async = require("meido.async")
 
 local array_clear = array.clear
 local etrigger = event.trigger

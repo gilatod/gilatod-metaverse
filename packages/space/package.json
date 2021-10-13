@@ -1,10 +1,10 @@
 {
-    "name": "gilatod-space",
+    "name": "space",
+    "version": "1.0.0",
     "description": "Linear algebra library",
     "authors": "Phlam Sicusa",
-    "version": "1.0.0",
     "main": "src/init.lua",
     "dependencies": {
-        "gilatod-meido": "^1.0.0"
+        "meido": "^1.0.0"
     }
 }

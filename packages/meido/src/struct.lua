@@ -1,6 +1,6 @@
-local guard = require("guard")
-local meta = require("meta")
-local pattern = require("pattern")
+local guard = require("meido.guard")
+local meta = require("meido.meta")
+local pattern = require("meido.pattern")
 
 local readonly = meta.readonly
 

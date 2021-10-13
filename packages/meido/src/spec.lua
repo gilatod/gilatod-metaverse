@@ -1,9 +1,9 @@
-local guard = require("guard")
-local object = require("object")
+local guard = require("meido.guard")
+local tablex = require("meido.tablex")
 
-local show = object.show
-local clone = object.clone
-local equal = object.equal
+local show = tablex.show
+local clone = tablex.clone
+local equal = tablex.equal
 
 local concat = table.concat
 local gsub = string.gsub

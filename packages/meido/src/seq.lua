@@ -1,4 +1,4 @@
-local guard = require "guard"
+local guard = require("meido.guard")
 
 local random = math.random
 local char = string.char

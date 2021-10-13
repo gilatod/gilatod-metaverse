@@ -1,5 +1,5 @@
-local guard = require("guard")
-local meta = require("meta")
+local guard = require("meido.guard")
+local meta = require("meido.meta")
 
 local coroutine_create = coroutine.create
 local coroutine_running = coroutine.running
@@ -90,10 +90,10 @@ local function current_coroutine()
 end
 
 local function safe_resume(co, ...)
-    local success, err =
+    local success, res =
         coroutine_resume(co, ...)
     if not success then
-        error(err, 0)
+        error(res, 0)
     end
 end
 

@@ -1,0 +1,11 @@
+{
+    "name": "phale-std",
+    "version": "1.0.0",
+    "description": "Standard effects for phale.",
+    "authors": "Phlam Sicusa",
+    "main": "src/init.lua",
+    "dependencies": {
+        "meido": "^1.0.0",
+        "phale": "^1.0.0"
+    }
+}

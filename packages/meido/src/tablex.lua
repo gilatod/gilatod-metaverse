@@ -1,6 +1,6 @@
 local concat = table.concat
 
-local object = {}
+local tablex = {}
 
 local control_escaps = {
     ["\a"] = "\\a",
@@ -24,7 +24,7 @@ local function is_identifier(str)
         and str:match("^[_%a][_%a%d]*$")
 end
 
-object.show = function(o, initial_indent, indent)
+tablex.show = function(o, initial_indent, indent)
     local t = type(o)
 
     if initial_indent then
@@ -119,9 +119,9 @@ object.show = function(o, initial_indent, indent)
         local field_indent = curr_indent..indent
 
         -- array elements
-        local o_len = #o
+        local o_len = rawlen(o)
         for i = 1, o_len do
-            local v = o[i]
+            local v = rawget(o, i)
             raw_show(v, field_indent)
             buffer[#buffer+1] = ", "
         end
@@ -179,7 +179,7 @@ object.show = function(o, initial_indent, indent)
     return concat(buffer)
 end
 
-object.equal = function(a, b)
+tablex.equal = function(a, b)
     local comparisons = {}
 
     local function raw_equal(a, b)
@@ -232,33 +232,33 @@ object.equal = function(a, b)
     return raw_equal(a, b)
 end
 
-object.clone = function(o)
-    if type(object) ~= "table" then
-        return object
+tablex.clone = function(o)
+    if type(tablex) ~= "table" then
+        return tablex
     end
 
     local obj_copies = {}
 
-    local function raw_copy(object)
-        if type(object) ~= "table" then
-            return object
+    local function raw_copy(tablex)
+        if type(tablex) ~= "table" then
+            return tablex
         end
 
-        local mt = getmetatable(object)
+        local mt = getmetatable(tablex)
         if type(mt) ~= "table"
                 or type(mt.__newindex) == "string" then
-            return object
+            return tablex
         end
 
-        local obj_copy = obj_copies[object]
+        local obj_copy = obj_copies[tablex]
         if obj_copy then
             return obj_copy
         end
 
         obj_copy = {}
-        obj_copies[object] = obj_copy
+        obj_copies[tablex] = obj_copy
 
-        for k, v in pairs(object) do
+        for k, v in pairs(tablex) do
             obj_copy[raw_copy(k)] = raw_copy(v)
         end
 
@@ -268,4 +268,4 @@ object.clone = function(o)
     return raw_copy(o)
 end
 
-return object
+return tablex

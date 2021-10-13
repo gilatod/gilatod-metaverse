@@ -1,5 +1,5 @@
-local guard = require("guard")
-local array = require("array")
+local guard = require("meido.guard")
+local array = require("meido.array")
 
 local remove_item = array.remove_item
 

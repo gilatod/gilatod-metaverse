@@ -49,7 +49,7 @@ const fileExists = function(filename) {
 	} catch(e) {
 		return false;
 	}
-}
+};
 
 const resolver = function(dep, dir, resourcePath) {
 	if (dep[0] == '.') {
@@ -60,38 +60,51 @@ const resolver = function(dep, dir, resourcePath) {
 	}
 
 	const ext = path.extname(resourcePath);
-	const base = path.join(...dep.split('.'));
+	const splited = dep.split('.');
+	const base = path.join(...splited);
 
 	const base_path = base + ext;
 	const base_path_js = base + '.js';
 	const init_file = 'init' + ext;
 
- 	const resolve = function(dir) {
- 		// try path + ext
-		const full_path = path.join(dir, base_path)
+	const resolve = function(dir) {
+		// try path + ext
+		const full_path = path.join(dir, base_path);
 		if (fileExists(path.resolve(full_path))) {
 			return full_path;
 		}
 	
- 		// try path + init.ext
-		const full_path_2 = path.join(dir, base, init_file)
+		// try path + init.ext
+		const full_path_2 = path.join(dir, base, init_file);
 		if (fileExists(path.resolve(full_path_2))) {
 			return full_path_2;
 		}
 
- 		// try path + js
-		const full_path_js = path.join(dir, base_path_js)
+		// try path + js
+		const full_path_js = path.join(dir, base_path_js);
 		if (fileExists(path.resolve(full_path_js))) {
 			return full_path_js;
 		}
 
- 		return null;
+		return null;
+	};
+
+	const res = resolve(dir) || resolve(path.dirname(dir));
+	if (res) {
+		return res;
+	} else if (splited.length == 1) {
+		return dep;
+	} else {
+		const relativePath = path.join(splited[0], 'src', ...splited.slice(1)) + ext;
+		const index = dir.indexOf('/' + splited[0] + '/');
+		if (index != -1) {
+			return dir.substring(0, index + 1) + relativePath;
+		} else {
+			return relativePath;
+		}
 	}
-	return resolve(dir)
-		|| resolve(path.dirname(dir))
-		|| dep.replace(/\./g, '-')
-			  .replace(/-specs$/, '/specs/init.lua');
-}
+};
+
 exports.raw = true;
 exports.default = function(source) {
 	const callback = this.async();
@@ -125,7 +138,7 @@ exports.default = function(source) {
 				if (lua_name === 'js') continue;
 				/* if lua requires 'foo' then look for webpack dependency 'foo' */
 				const srcPath = this.resourcePath.substring(
-					0, this.resourcePath.indexOf('/src/') + 5)
+					0, this.resourcePath.indexOf('/src/') + 5);
 				lua_dependencies[lua_name] =
 					resolver(lua_name, srcPath, this.resourcePath);
 			}
@@ -143,7 +156,9 @@ exports.default = function(source) {
 				let lua_name = lua_dependencies_keys[i];
 				let require_path = lua_dependencies[lua_name];
 				if (!require_path) { continue; }
-				this.addDependency(require_path);
+				if (path.isAbsolute(require_path)) {
+					this.addDependency(require_path);
+				}
 				s +=
 					'lua.lua_pushcfunction(L, function(L){push(L, require(' + JSON.stringify(require_path) +')); return 1;});\n' +
 					'lua.lua_setfield(L, -2, fengari_web.to_luastring(' + JSON.stringify(lua_name) + '));\n';

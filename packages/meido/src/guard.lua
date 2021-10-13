@@ -1,4 +1,4 @@
-local object = require("object")
+local tablex = require("meido.tablex")
 
 local math_type = math.type
 
@@ -14,7 +14,7 @@ local function inspect(v)
     if not guard.inspect_enabled then
         return ""
     end
-    return ", got "..object.show(v)
+    return ", got "..tablex.show(v)
 end
 
 guard.set_inspect_enabled = function(enabled)

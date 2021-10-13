@@ -1,7 +1,6 @@
-local guard = require("guard")
-local meta = require("meta")
-local object = require("object")
-local array = require("array")
+local guard = require("meido.guard")
+local meta = require("meido.meta")
+local array = require("meido.array")
 
 local clear = array.clear
 local ungrowable = meta.ungrowable
@@ -23,10 +22,7 @@ if math_type == nil then
 end
 
 local EMPTY_TABLE = ungrowable {}
-local ID_FUNC = function(...) return ... end
-
 local NO_DEFAULT = ungrowable {}
-local FAILED_PATTERN_INDEX = ungrowable {}
 
 local pattern = setmetatable({}, {
     __call = function(self, category, default, desc_func, match_func)
@@ -55,6 +51,8 @@ local pattern = setmetatable({}, {
 })
 pattern.__index = pattern
 
+pattern.NO_DEFAULT = NO_DEFAULT
+
 function pattern:has_default()
     return self.default ~= NO_DEFAULT
 end
@@ -82,6 +80,38 @@ function pattern:match(value, collection, stack)
     end
 end
 
+function pattern:guard(name, value)
+    if not self:match(value) then
+        error(name.." must be "..self.category)
+    end
+end
+
+function to_pattern(p)
+    if type(p) == "table" then
+        local to_pattern = p.to_pattern
+        if pattern.CALLABLE:match(to_pattern) then
+            return to_pattern(p)
+        end
+    end
+
+    local mt = getmetatable(p)
+    if mt == pattern then
+        return p
+    elseif type(mt) == "table"
+        and getmetatable(mt.__index) == pattern then
+        return p
+    end
+end
+
+function require_pattern(p, text)
+    local p = to_pattern(p)
+    if p then return p end
+    error(text or "invalid pattern", 2)
+end
+
+pattern.from = to_pattern
+pattern.require = require_pattern
+
 -- basic patterns
 
 local function basic_pattern(type_name, default)
@@ -94,7 +124,7 @@ pattern.NIL      = basic_pattern("nil", nil)
 pattern.STRING   = basic_pattern("string", "")
 pattern.NUMBER   = basic_pattern("number", 0)
 pattern.TABLE    = basic_pattern("table", EMPTY_TABLE)
-pattern.FUNCTION = basic_pattern("function", ID_FUNC)
+pattern.FUNCTION = basic_pattern("function", NO_DEFAULT)
 pattern.BOOLEAN  = basic_pattern("boolean", false)
 
 pattern.ANY = pattern("basic", nil,
@@ -126,9 +156,7 @@ pattern.value = function(value)
                 return tostring(value)
             end
         end,
-        function(v)
-            return v == value
-        end)
+        function(v) return v == value end)
 
     function pat:get_value()
         return value
@@ -137,18 +165,37 @@ pattern.value = function(value)
     return pat
 end
 
-pattern.collect = function(index)
-    local pat = pattern("collect", NO_DEFAULT,
-        function() return "@"..tostring(index) end,
-        function(v, c)
-            if type(c) == "table" then
-                c[index] = v
+pattern.collect = function(key, mapper)
+    guard.non_nil("key", key)
+    local match_func
+    if mapper then
+        guard.callable("mapper", mapper)
+        match_func = function(v, c)
+            if c then
+                local result = mapper(v)
+                if result then
+                    c[key] = result
+                    return true
+                else
+                    return false
+                end
+            end
+        end
+    else
+        match_func = function(v, c)
+            if c then
+                c[key] = v
             end
             return true
-        end)
+        end
+    end
+
+    local pat = pattern("collect", NO_DEFAULT,
+        function() return "@"..tostring(index) end,
+        match_func)
     
-    function pat:get_index()
-        return index
+    function pat:get_key()
+        return key
     end
 
     return pat
@@ -157,8 +204,7 @@ end
 -- combinators
 
 pattern.no_default = function(pat)
-    assert(getmetatable(pat) == pattern,
-        "invalid pattern")
+    pat = require_pattern(pat)
 
     local new_pat = pattern("no_default", NO_DEFAULT,
         function() return format("no_default[%s]", pat) end,
@@ -172,10 +218,8 @@ pattern.no_default = function(pat)
 end
 
 pattern.with_default = function(pat, default)
-    assert(getmetatable(pat) == pattern,
-        "invalid pattern")
-    assert(pat:match(default),
-        "invalid default value")
+    pat = require_pattern(pat)
+    assert(pat:match(default), "invalid default value")
 
     local new_pat = pattern("with_default", default,
         function()
@@ -191,10 +235,9 @@ pattern.with_default = function(pat, default)
     return new_pat
 end
 
-pattern.named = function(name, pat)
+pattern.named = function(pat, name)
+    pat = require_pattern(pat)
     guard.nonempty_string("name", name)
-    assert(getmetatable(pat) == pattern,
-        "invalid pattern")
     
     local new_pat = pattern("named", pat.default,
         function() return name end,
@@ -214,8 +257,8 @@ pattern.union = function(...)
     end
 
     for i = 1, #subpats do
-        local subpat = subpats[i]
-        if getmetatable(subpat) ~= pattern then
+        local subpat = to_pattern(subpats[i])
+        if not subpat then
             error("invalid subpattern at index #"..i)
         end
     end
@@ -264,8 +307,8 @@ pattern.intersect = function(...)
     end
 
     for i = 1, #subpats do
-        local subpat = subpats[i]
-        if getmetatable(subpat) ~= pattern then
+        local subpat = to_pattern(subpats[i])
+        if not subpat then
             error("invalid subpattern at index #"..i)
         end
     end
@@ -327,8 +370,7 @@ pattern.recurse = function(name, pattern_creator)
         end)
 
     pat = pattern_creator(hook_pat)
-    assert(getmetatable(pat) == pattern,
-        "invalid pattern creator")
+    pat = require_pattern(pat, "invalid pattern creator")
 
     return pattern("recurse", pat.default,
         function() return format("%s : %s", name, pat) end,
@@ -341,7 +383,7 @@ end
 
 local function basic_nilable(type_name)
     return pattern("nilable", nil,
-        function() return type_name.."?" end,
+        function() return "?"..type_name end,
         function(v) return v == nil or type(v) == type_name end)
 end
 
@@ -352,11 +394,10 @@ pattern.FUNCTION_OR_NIL = basic_nilable("function")
 pattern.BOOLEAN_OR_NIL  = basic_nilable("boolean")
 
 pattern.nilable = function(pat)
-    assert(getmetatable(pat) == pattern,
-        "invalid pattern")
+    pat = require_pattern(pat)
     
     local new_pat = pattern("nilable", nil,
-        function() return format("nilable[%s]", pat) end,
+        function() return format("?%s", pat) end,
         function(v, c, s) return v == nil or pat:match(v, c, s) end)
     
     function new_pat:get_raw_pattern()
@@ -460,7 +501,7 @@ end
 
 -- string patterns
 
-pattern.NONEMPTY_STRING = pattern("string", "NIL",
+pattern.NONEMPTY_STRING = pattern("string", NO_DEFAULT,
     function() return "nonempty_string" end,
     function(v) return type(v) == "string" and #v > 0 end)
 
@@ -484,7 +525,7 @@ end
 
 -- callable patterns
 
-pattern.CALLABLE = pattern("callable", ID_FUNC,
+pattern.CALLABLE = pattern("callable", NO_DEFAULT,
     function() return "callable" end,
     function(v)
         if type(v) == "function" then
@@ -495,7 +536,7 @@ pattern.CALLABLE = pattern("callable", ID_FUNC,
     end)
 
 pattern.CALLABLE_OR_NIL = pattern("callable", nil,
-    function() return "callable?" end,
+    function() return "?callable" end,
     function(v)
         if not v or type(v) == "function" then
             return true
@@ -573,8 +614,7 @@ end
 -- table patterns
 
 pattern.array = function(element_pattern)
-    assert(getmetatable(element_pattern) == pattern,
-        "invalid element_pattern")
+    pat = require_pattern(element_pattern, "invalid element pattern")
     
     local pat = pattern("array", EMPTY_TABLE,
         function()
@@ -601,10 +641,8 @@ pattern.array = function(element_pattern)
 end
 
 pattern.map = function(key_pattern, value_pattern)
-    assert(getmetatable(key_pattern) == pattern,
-        "invalid key_pattern")
-    assert(getmetatable(value_pattern) == pattern,
-        "invalid value_pattern")
+    key_pattern = require_pattern(key_pattern, "invalid key pattern")
+    value_pattern = require_pattern(value_pattern, "invalid value pattern")
     
     local pat = pattern("map", EMPTY_TABLE,
         function()
@@ -645,8 +683,8 @@ pattern.tuple = function(...)
     local default
 
     for i = 1, #subpats do
-        local subpat = subpats[i]
-        if getmetatable(subpat) ~= pattern then
+        local subpat = to_pattern(subpats[i])
+        if not subpat then
             error("invalid subpattern at index #"..i)
         end
         if not subpat:has_default() then
@@ -697,7 +735,8 @@ pattern.table = function(entries)
     local default
 
     for key, value_pat in pairs(entries) do
-        if getmetatable(value_pat) ~= pattern then
+        value_pat = to_pattern(value_pat)
+        if not value_pat then
             error("invalid entry at index #"..i)
         end
 
@@ -735,7 +774,6 @@ pattern.table = function(entries)
             for key, value_pat in pairs(entries_cpy) do
                 local value = v[key]
                 if not value_pat:match(value, c, s) then
-                    print(key, value)
                     return false
                 end
             end
@@ -756,11 +794,10 @@ pattern.loop = function(...)
     end
 
     for i = 1, #subpats do
-        local subpat = subpats[i]
-        if getmetatable(subpat) ~= pattern then
+        local subpat = to_pattern(subpats[i])
+        if not subpat then
             error("invalid subpattern at index #"..i)
-        end
-        if subpat:match(nil) then
+        elseif subpat:match(nil) then
             error("pattern that matches nil cannot be used in loop")
         end
     end

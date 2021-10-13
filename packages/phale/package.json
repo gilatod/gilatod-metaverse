@@ -1,0 +1,10 @@
+{
+    "name": "phale",
+    "version": "1.0.0",
+    "description": "Support for overloadable Lua-like computation.",
+    "authors": "Phlam Sicusa",
+    "main": "src/init.lua",
+    "dependencies": {
+        "meido": "^1.0.0"
+    }
+}

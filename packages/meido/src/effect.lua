@@ -1,5 +1,5 @@
-local guard = require("guard")
-local meta = require("meta")
+local guard = require("meido.guard")
+local meta = require("meido.meta")
 
 local unpack = table.unpack
 
