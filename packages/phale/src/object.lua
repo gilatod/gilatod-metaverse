@@ -14,13 +14,13 @@ setmetatable(object, {
 })
 
 function object:__index(k)
-    local obj = object("index", self, k)
+    local obj = object("__index", self, k)
     rawset(self, k, obj)
     return obj
 end
 
 function object:__call(...)
-    return object("call", {self, ...})
+    return object("__call", {self, ...})
 end
 
 local function register_uniary(mt_func, tag)
@@ -29,9 +29,9 @@ local function register_uniary(mt_func, tag)
     end
 end
 
-register_uniary("__unm", "unm")
-register_uniary("__len", "len")
-register_uniary("__bnot", "bnot")
+register_uniary("__unm", "__unm")
+register_uniary("__len", "__len")
+register_uniary("__bnot", "__bnot")
 
 local function register_binary(mt_func, tag)
     object[mt_func] = function(left, right)
@@ -39,25 +39,25 @@ local function register_binary(mt_func, tag)
     end
 end
 
-register_binary("__add", "add")
-register_binary("__sub", "sub")
-register_binary("__mul", "mul")
-register_binary("__div", "div")
-register_binary("__idiv", "idiv")
+register_binary("__add", "__add")
+register_binary("__sub", "__sub")
+register_binary("__mul", "__mul")
+register_binary("__div", "__div")
+register_binary("__idiv", "__idiv")
 
-register_binary("__pow", "pow")
-register_binary("__mod", "mod")
-register_binary("__concat", "concat")
-register_binary("__eq", "eq")
-register_binary("__lt", "lt")
-register_binary("__le", "le")
+register_binary("__pow", "__pow")
+register_binary("__mod", "__mod")
+register_binary("__concat", "__concat")
+register_binary("__eq", "__eq")
+register_binary("__lt", "__lt")
+register_binary("__le", "__le")
 
-register_binary("__band", "band")
-register_binary("__bor", "bor")
-register_binary("__bxor", "bxor")
+register_binary("__band", "__band")
+register_binary("__bor", "__bor")
+register_binary("__bxor", "__bxor")
 
-register_binary("__shl", "shl")
-register_binary("__shr", "shr")
+register_binary("__shl", "__shl")
+register_binary("__shr", "__shr")
 
 object.memorize = function(computation)
     guard.callable("computation", computation)

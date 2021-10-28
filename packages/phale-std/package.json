@@ -1,7 +1,7 @@
 {
     "name": "phale-std",
     "version": "1.0.0",
-    "description": "Standard effects for phale.",
+    "description": "Standard library for phale.",
     "authors": "Phlam Sicusa",
     "main": "src/init.lua",
     "dependencies": {
