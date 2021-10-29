@@ -218,7 +218,11 @@ std.ORD = typeclass("ord")
 -- lattice
 
 std.MEET_SEMILATTICE = typeclass("meet_semilattice", {
-    meet = CALLALE
+    meet = CALLABLE:with_default(function(imp, itp, o1, o2)
+        o1 = itp(o1)
+        o2 = itp(o2)
+        return o1 >= o2 and o1 or o2
+    end)
 }):inherit(std.POSET)
 
 std.meet = function(o1, o2)
@@ -226,7 +230,11 @@ std.meet = function(o1, o2)
 end
 
 std.JOIN_SEMILATTICE = typeclass("join_semilattice", {
-    join = CALLALE
+    join = CALLALE:with_default(function(imp, itp, o1, o2)
+        o1 = itp(o1)
+        o2 = itp(o2)
+        return o1 >= o2 and o2 or o1
+    end)
 }):inherit(std.POSET)
 
 std.join = function(o1, o2)
@@ -341,13 +349,11 @@ std.FUNCTIONAL = typeclass("functional", {
 
 -- lambda
 
-local tablex = require("meido.tablex")
-
 std.LAMBDA = typeclass("lambda", {
     lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
         return function(...)
-            local env = {}
             local values = {...}
+            local env = {}
             for i = 1, #arguments do
                 itp(arguments[i])(env, values[i])
             end
