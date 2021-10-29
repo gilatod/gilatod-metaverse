@@ -22,6 +22,7 @@ setmetatable(typeclass, {
         local parents = {}
         local children = {}
         local patterns = {}
+        local raw_itps = {}
         local defaults = setmetatable({}, {
             __index = function(t, k)
                 for i = #parents, 1, -1 do
@@ -59,19 +60,17 @@ setmetatable(typeclass, {
             "phale.typeclass", NO_DEFAULT,
             function() return name end,
             function(v, c, s)
-                for i = #children, 1, -1 do
-                    if children[i]:match(v, c, s) then
-                        return true
-                    end
+                if not instance.full then
+                    return false
                 end
-                if instance.full then
-                    local co = co_create(interpret)
-                    local succ, res = co_resume(co, v, defaults)
-                    if not succ then error(res, 0) end
-                    if co_status(co) ~= "suspended" then
-                        if c then c["@"] = res end
-                        return true
+                local succ, res = pcall(interpret, v, defaults)
+                if not succ then
+                    if not res:match("failed to interpret object") then
+                        error(res, 0)
                     end
+                else
+                    if c then c["@"] = res end
+                    return true
                 end
             end)
 
@@ -84,8 +83,6 @@ setmetatable(typeclass, {
     end
 })
 typeclass.__index = typeclass
-
-typeclass.skip = co_yield
 
 function typeclass:__tostring()
     return tostring(self.pattern)
@@ -169,7 +166,7 @@ function typeclass:inherit(...)
     local tcs = {...}
     local parents = self.parents
 
-    for i = 1, #tcs do
+    for i = 1, select("#", ...) do
         local tc = tcs[i]
         typeclass:guard("argument", tc)
         parents[#parents+1] = tc

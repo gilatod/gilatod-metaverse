@@ -2,6 +2,10 @@ local guard = require("meido.guard")
 local pattern = require("meido.pattern")
 
 local unpack = table.unpack
+local co_create = coroutine.create
+local co_yield = coroutine.yield
+local co_resume = coroutine.resume
+local co_status = coroutine.status
 
 local object = {}
 
@@ -59,40 +63,34 @@ register_binary("__bxor", "__bxor")
 register_binary("__shl", "__shl")
 register_binary("__shr", "__shr")
 
-object.memorize = function(computation)
-    guard.callable("computation", computation)
-    local value
-    return object("memorize", function()
-        if value == nil then
-            value = computation()
-        end
-        return value
-    end)
+object.has_tag = function(obj, tag)
+    return getmetatable(obj) == object
+        and rawget(obj, 1) == tag
 end
 
 object.interpret = function(obj, interpreters)
     local function do_interpret(obj)
+        local res
+
         if getmetatable(obj) ~= object then
-            local lift = interpreters["@"]
+            local lift = interpreters[getmetatable(obj)]
+                or interpreters[type(obj)]
+                or interpreters["@"]
             if not lift then
-                error("failed to interpret raw value with type '"..type(obj).."'")
+                error("failed to interpret object with raw type '"..type(obj).."'")
             end
             return lift(interpreters, do_interpret, obj)
+        else
+            local tag = rawget(obj, 1)
+            local args = rawget(obj, 2)
+            local interpreter = interpreters[tag]
+            if not interpreter then
+                error("failed to interpret object with tag '"..tostring(tag).."'")
+            end
+            return interpreter(interpreters, do_interpret, unpack(args))
         end
-
-        local tag = rawget(obj, 1)
-        local args = rawget(obj, 2)
-
-        if tag == "memorize" then
-            return do_interpret(args[1]())
-        end
-
-        local interpreter = interpreters[tag]
-        if not interpreter then
-            error("failed to interpret object with tag '"..tag.."'")
-        end
-        return interpreter(interpreters, do_interpret, unpack(args))
     end
+
     return do_interpret(obj)
 end
 

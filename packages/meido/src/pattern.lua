@@ -82,7 +82,7 @@ end
 
 function pattern:guard(name, value)
     if not self:match(value) then
-        error(name.." must be "..self.category)
+        error(name.." must be "..self.desc_func(), 2)
     end
 end
 
@@ -551,12 +551,12 @@ pattern.meta = function(name, metatable)
     guard.nonempty_string("name", name)
     guard.table("metatable", metatable)
 
-    local pat = pattern("meta", nil,
+    local pat = pattern("meta", NO_DEFAULT,
         function()
             return "%"..name
         end,
         function(v)
-            return v == nil or getmetatable(v) == metatable
+            return getmetatable(v) == metatable
         end)
     
     function pat:get_metatable()

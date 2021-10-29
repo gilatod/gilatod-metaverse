@@ -104,11 +104,9 @@ std.SEMIGROUP = typeclass("semigroup", {
 })
 
 std.MONOID = typeclass("monoid", {
-    ["@"] = CALLABLE:with_default(function(itp, value)
+    number = CALLABLE:with_default(function(imp, itp, value)
         if value == 0 then
             return itp(std.unit)
-        else
-            typeclass.skip()
         end
     end),
     unit = CALLABLE:with_default(
@@ -136,11 +134,9 @@ std.MUL_SEMIGROUP = typeclass("mul_semigroup", {
 })
 
 std.MUL_MONOID = typeclass("mul_monoid", {
-    ["@"] = CALLABLE:with_default(function(itp, value)
+    number = CALLABLE:with_default(function(imp, itp, value)
         if value == 1 then
             return itp(std.munit)
-        else
-            typeclass.skip()
         end
     end),
     munit = CALLABLE:with_default(
@@ -163,13 +159,11 @@ end
 -- ring
 
 std.SEMIRING = typeclass("semiring", {
-    ["@"] = CALLABLE:with_default(function(itp, value)
+    number = CALLABLE:with_default(function(imp, itp, value)
         if value == 0 then
             return itp(std.unit)
         elseif value == 1 then
             return itp(std.munit)
-        else
-            typeclass.skip()
         end
     end)
 }):inherit(std.MONOID, std.MUL_MONOID)
@@ -230,7 +224,7 @@ std.meet = function(o1, o2)
 end
 
 std.JOIN_SEMILATTICE = typeclass("join_semilattice", {
-    join = CALLALE:with_default(function(imp, itp, o1, o2)
+    join = CALLABLE:with_default(function(imp, itp, o1, o2)
         o1 = itp(o1)
         o2 = itp(o2)
         return o1 >= o2 and o2 or o1
@@ -275,13 +269,8 @@ end
 -- number
 
 std.NUMBER = typeclass("number", {
-    ["@"] = CALLABLE:with_default(function(imp, itp, value)
-        if type(value) == "number" then
-            return value
-        else
-            typeclass.skip()
-        end
-    end)
+    number = CALLABLE:with_default(
+        function(imp, itp, value) return value end)
 }):inherit(std.RING, std.SIGNED, std.EQ)
 
 std.REAL = typeclass("real")
@@ -295,7 +284,7 @@ std.INTEGRAL = typeclass("integral", {
 }):inherit(std.REAL, std.ENUM)
 
 std.FRACTIONAL = typeclass("fractional")
-    :inherit(std.NUM, std.FIELD)
+    :inherit(std.NUMBER, std.FIELD)
 
 std.FLOATING = typeclass("floating", {
     __pow = CALLABLE:with_default(
@@ -349,13 +338,20 @@ std.FUNCTIONAL = typeclass("functional", {
 
 -- lambda
 
+local function set_argument(itp, env, arg, value)
+    local succ, info = pcall(itp(arg), env, value)
+    if not succ then
+        error("invalid argument at #"..i..": "..info)
+    end
+end
+
 std.LAMBDA = typeclass("lambda", {
     lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
         return function(...)
             local values = {...}
             local env = {}
             for i = 1, #arguments do
-                itp(arguments[i])(env, values[i])
+                set_argument(itp, env, arguments[i], itp(values[i]))
             end
             return interpret(body, setmetatable({
                 _ = function(sub_imp, sub_itp, argument)
@@ -372,12 +368,65 @@ std.LAMBDA = typeclass("lambda", {
     end)
 }):inherit(std.FUNCTIONAL)
 
+std.TYPED_LAMBDA = typeclass("typed_lambda", {
+    [typeclass] = CALLABLE:with_default(
+        function(imp, itp, value) return value end),
+    [pattern] = CALLABLE:with_default(
+        function(imp, itp, value) return value end),
+
+    typed_lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
+        return function(...)
+            local values = {...}
+            local env = {}
+
+            for i = 1, #arguments do
+                local arg = arguments[i]
+                if object.has_tag(arg, "__pow") then
+                    local decl = rawget(arg, 2)
+                    local arg_t = itp(decl[2])
+                    if not arg_t then
+                        error(("invalid type for argument #%d")
+                            :format(i))
+                    end
+
+                    local value = values[i]
+                    local collec = {}
+                    if not arg_t:match(value, collec) then
+                        error(("invalid argument #%d (%s expected, got %s)")
+                            :format(i, arg_t, type(value)))
+                    end
+                    value = collec["@"] or value
+                    set_argument(itp, env, decl[1], value)
+                else
+                    set_argument(itp, env, arg, itp(values[i]))
+                end
+            end
+
+            return interpret(body, setmetatable({
+                _ = function(sub_imp, sub_itp, argument)
+                    return env[argument]
+                end
+            }, {__index = imp}))
+        end
+    end)
+}):inherit(std.LAMBDA)
+
 std.lambda = function(...)
     local count = select("#", ...)
     local arguments = {...}
     local body = arguments[count]
     arguments[count] = nil
-    return object("lambda", arguments, body)
+
+    local tag = "lambda"
+    for i = 1, #arguments do
+        local arg = arguments[i]
+        if object.has_tag(arg, "__pow") then
+            tag = "typed_lambda"
+            break
+        end
+    end
+
+    return object(tag, arguments, body)
 end
 
 std._ = setmetatable({}, {
@@ -388,7 +437,7 @@ std._ = setmetatable({}, {
 
 -- condition
 
-std.CONDITIONAL = typeclass("conditional", {
+std.CONDITION = typeclass("condition", {
     cond = CALLABLE:with_default(function(imp, itp, o, true_condition, false_condition)
         if itp(o) then
             return itp(true_condition)
@@ -406,7 +455,7 @@ end
 
 local guard_mt = {
     __bor = function(self, branch)
-        assert(getmetatable(branch) == object and rawget(branch, 1) == "__shr",
+        assert(object.has_tag(branch, "__shr"),
             "invalid branch for guard")
         self[#self+1] = rawget(branch, 2)
         return self
@@ -424,10 +473,8 @@ end
 
 std.GUARD = typeclass("guard", {
     guard = CALLABLE:with_default(function(imp, itp, g)
-        if getmetatable(g) ~= guard_mt then
-            typeclass.skip()
-        end
-        local value = itp(g[1])
+        assert(getmetatable(g) == guard_mt, "invalid guard")
+        local value = g[1]
         for i = 2, #g do
             local branch = g[i]
             if itp(branch[1])(value) then
@@ -438,23 +485,11 @@ std.GUARD = typeclass("guard", {
     end)
 }):inherit(std.FUNCTIONAL)
 
-local LUA_VALUE = typeclass("lua_value")
-    :inherit(std.GUARD, std.LAMBDA, std.REAL)
-
-local _ = std._
-local c = std.c
-local coll = {}
-LUA_VALUE:match(
-    ~(std.guard(1)
-        | std.lambda(_.x, std.gt(_.x, 2)) >> 20
-        | std.lambda(_.x, std.ge(_.x, 1)) >> 10), coll)
-print(coll['@'])
-
 -- pattern matching
 
 local match_mt = {
     __bor = function(self, branch)
-        assert(getmetatable(branch) == object and rawget(branch, 1) == "__shr",
+        assert(object.has_tag(branch, "__shr"),
             "invalid branch for match")
         self[#self+1] = rawget(branch, 2)
         return self
@@ -469,7 +504,5 @@ std.match_mt = match_mt
 std.match = function(o)
     return setmetatable({o}, match_mt)
 end
-
-
 
 return std
