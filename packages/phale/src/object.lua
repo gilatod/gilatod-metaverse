@@ -48,9 +48,9 @@ register_binary("__idiv", "__idiv")
 register_binary("__pow", "__pow")
 register_binary("__mod", "__mod")
 register_binary("__concat", "__concat")
-register_binary("__eq", "__eq")
-register_binary("__lt", "__lt")
-register_binary("__le", "__le")
+-- register_binary("__eq", "__eq")
+-- register_binary("__lt", "__lt")
+-- register_binary("__le", "__le")
 
 register_binary("__band", "__band")
 register_binary("__bor", "__bor")
@@ -74,7 +74,10 @@ object.interpret = function(obj, interpreters)
     local function do_interpret(obj)
         if getmetatable(obj) ~= object then
             local lift = interpreters["@"]
-            return lift and lift(do_interpret, obj) or obj
+            if not lift then
+                error("failed to interpret raw value with type '"..type(obj).."'")
+            end
+            return lift(interpreters, do_interpret, obj)
         end
 
         local tag = rawget(obj, 1)

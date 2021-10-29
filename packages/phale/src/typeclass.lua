@@ -43,7 +43,9 @@ setmetatable(typeclass, {
             guard.table("patterns", pats)
             for key, pat in pairs(pats) do
                 local pat = pattern.from(pat)
-                if pat:has_default() then
+                if pat == nil then
+                    error("invalid field: "..key)
+                elseif pat:has_default() then
                     defaults[key] = pat:get_default()
                 else
                     full = false

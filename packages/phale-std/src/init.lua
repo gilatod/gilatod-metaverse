@@ -44,17 +44,21 @@ end
 -- eq
 
 std.EQ = typeclass("eq", {
-    __eq = CALLABLE:with_default(
+    eq = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) == itp(o2) end),
 })
+
+std.eq = function(o1, o2)
+    return object("eq", o1, o2)
+end
 
 -- enum
 
 std.ENUM = typeclass("enum", {
     pred = CALLABLE:with_default(
-        function(imp, itp, o) return to_enum(from_enum(o) - 1) end),
+        function(imp, itp, o) return itp(std.to_enum(std.from_enum(o) - 1)) end),
     succ = CALLABLE:with_default(
-        function(imp, itp, o) return to_enum(from_enum(o) + 1) end),
+        function(imp, itp, o) return itp(std.to_enum(std.from_enum(o) + 1)) end),
 
     to_enum = CALLABLE,
     from_enum = CALLABLE
@@ -102,7 +106,7 @@ std.SEMIGROUP = typeclass("semigroup", {
 std.MONOID = typeclass("monoid", {
     ["@"] = CALLABLE:with_default(function(itp, value)
         if value == 0 then
-            return std.unit
+            return itp(std.unit)
         else
             typeclass.skip()
         end
@@ -134,7 +138,7 @@ std.MUL_SEMIGROUP = typeclass("mul_semigroup", {
 std.MUL_MONOID = typeclass("mul_monoid", {
     ["@"] = CALLABLE:with_default(function(itp, value)
         if value == 1 then
-            return std.munit
+            return itp(std.munit)
         else
             typeclass.skip()
         end
@@ -161,13 +165,13 @@ end
 std.SEMIRING = typeclass("semiring", {
     ["@"] = CALLABLE:with_default(function(itp, value)
         if value == 0 then
-            return std.unit
+            return itp(std.unit)
         elseif value == 1 then
-            return std.munit
+            return itp(std.munit)
         else
             typeclass.skip()
         end
-    end),
+    end)
 }):inherit(std.MONOID, std.MUL_MONOID)
 
 std.RING = typeclass("ring")
@@ -179,14 +183,34 @@ std.FIELD = typeclass("field")
 -- order
 
 std.POSET = typeclass("poset", {
-    __le = CALLABLE:with_default(
+    le = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) <= itp(o2) end),
+    gt = CALLABLE:with_default(
+        function(imp, itp, o1, o2) return itp(o1) > itp(o2) end)
 })
 
+std.le = function(o1, o2)
+    return object("le", o1, o2)
+end
+
+std.gt = function(o1, o2)
+    return object("gt", o1, o2)
+end
+
 std.STRICT_POSET = typeclass("strict_poset", {
-    __lt = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) < itp(o2) end),
+    ge = CALLABLE:with_default(
+        function(imp, itp, o1, o2) return itp(o1) >= itp(o2) end),
+    lt = CALLABLE:with_default(
+        function(imp, itp, o1, o2) return itp(o1) < itp(o2) end)
 })
+
+std.ge = function(o1, o2)
+    return object("ge", o1, o2)
+end
+
+std.lt = function(o1, o2)
+    return object("lt", o1, o2)
+end
 
 std.ORD = typeclass("ord")
     :inherit(std.EQ, std.POSET, std.STRICT_POSET)
@@ -226,8 +250,10 @@ end
 -- signed
 
 std.SIGNED = typeclass("signed", {
-    abs = CALLABLE,
-    signum = CALLABLE
+    abs = CALLABLE:with_default(
+        function(imp, itp, o) return math.abs(itp(o)) end),
+    signum = CALLABLE:with_default(
+        function(imp, itp, o) return itp(o) >= 0 and 1 or -1 end)
 })
 
 std.abs = function(o)
@@ -241,56 +267,27 @@ end
 -- number
 
 std.NUMBER = typeclass("number", {
-    ["@"] = CALLABLE:with_default(function(itp, value)
-        if math.type(value) == "integer" then
-            return std.from_integer(value)
+    ["@"] = CALLABLE:with_default(function(imp, itp, value)
+        if type(value) == "number" then
+            return value
         else
             typeclass.skip()
         end
-    end),
-    from_integer = CALLABLE,
+    end)
 }):inherit(std.RING, std.SIGNED, std.EQ)
 
-std.from_integer = function(num)
-    guard.integer("num", num)
-    return object("from_integer", num)
-end
-
-std.REAL = typeclass("real", {
-    to_rational = CALLABLE
-}):inherit(std.NUMBER, std.ORD)
-
-std.to_rational = function(o)
-    return object("to_rational", o)
-end
+std.REAL = typeclass("real")
+    :inherit(std.NUMBER, std.ORD)
 
 std.INTEGRAL = typeclass("integral", {
     __idiv = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) // itp(o2) end),
     __mod = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) % itp(o2) end),
-    to_integer = CALLABLE
+        function(imp, itp, o1, o2) return itp(o1) % itp(o2) end)
 }):inherit(std.REAL, std.ENUM)
 
-std.to_integer = function(o)
-    return object("to_integer", o)
-end
-
-std.FRACTIONAL = typeclass("fractional", {
-    ["@"] = CALLABLE:with_default(function(itp, value)
-        if type(value) == "number" then
-            return std.from_rational(value)
-        else
-            typeclass.skip()
-        end
-    end),
-    from_rational = CALLABLE
-}):inherit(std.NUM, std.FIELD)
-
-std.from_rational = function(num)
-    guard.number("num", num)
-    return object("from_rational", num)
-end
+std.FRACTIONAL = typeclass("fractional")
+    :inherit(std.NUM, std.FIELD)
 
 std.FLOATING = typeclass("floating", {
     __pow = CALLABLE:with_default(
@@ -342,26 +339,30 @@ std.FUNCTIONAL = typeclass("functional", {
         function(imp, itp, o, ...) return itp(o)(...) end),
 })
 
--- higher order
+-- lambda
 
-std.HIGHER_ORDER = typeclass("higher_order", {
+local tablex = require("meido.tablex")
+
+std.LAMBDA = typeclass("lambda", {
     lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
         return function(...)
             local env = {}
             local values = {...}
             for i = 1, #arguments do
-                env[arguments[i]] = values[i]
+                itp(arguments[i])(env, values[i])
             end
             return interpret(body, setmetatable({
-                _ = function(imp, itp, argument)
+                _ = function(sub_imp, sub_itp, argument)
                     return env[argument]
                 end
             }, {__index = imp}))
         end
     end),
 
-    _ = CALLABLE:with_default(function(imp, itp, argument)
-        return std._(argument)
+    _ = CALLABLE:with_default(function(imp, itp, key)
+        return function(env, value)
+            env[key] = value
+        end
     end)
 }):inherit(std.FUNCTIONAL)
 
@@ -373,10 +374,11 @@ std.lambda = function(...)
     return object("lambda", arguments, body)
 end
 
-std._ = function(argument)
-    guard.non_nil("argument", argument)
-    return object("_", argument, body)
-end
+std._ = setmetatable({}, {
+    __index = function(self, key)
+        return object("_", key)
+    end
+})
 
 -- condition
 
@@ -388,7 +390,7 @@ std.CONDITIONAL = typeclass("conditional", {
             return itp(false_condition)
         end
     end)
-}):inherit(std.HIGHER_ORDER)
+})
 
 std.cond = function(o, true_condition, false_condition)
     return object("cond", o, true_condition, false_condition)
@@ -396,74 +398,72 @@ end
 
 -- guard
 
-guard(asdf)
-    | asdf >> 
-    | asdf
-    | jioasdf
-
-local guard_checker_mt = {
-    __call = function(self, case)
-        local condition = case[1]
-        return condition(self[0])
+local guard_mt = {
+    __bor = function(self, branch)
+        assert(getmetatable(branch) == object and rawget(branch, 1) == "__shr",
+            "invalid branch for guard")
+        self[#self+1] = rawget(branch, 2)
+        return self
+    end,
+    __bnot = function(self)
+        return object("guard", self)
     end
 }
-guard
-    | asdf | asdf | asdf | asdf
+
+std.guard_mt = guard_mt
+
+std.guard = function(o)
+    return setmetatable({o}, guard_mt)
+end
 
 std.GUARD = typeclass("guard", {
-    guard = CALLABLE:with_default(function(imp, itp, o)
-        return setmetatable({itp(o)}, guard_checker_mt)
-    end),
-
-    __bor = CALLABLE:with_default(function(imp, itp, checker, case)
-        if getmetatable(checker) ~= guard_checker_mt then
-            typeclass.skip()
-        elseif not checker.success and checker(itp(case)) then
-            checker.success = true
-        end
-        return checker
-    end),
-
-    __shl = CALLABLE:with_default(function(imp, itp, condition, continuation)
-        condition = itp(condition)
-        if type(condition) ~= "function" then
+    guard = CALLABLE:with_default(function(imp, itp, g)
+        if getmetatable(g) ~= guard_mt then
             typeclass.skip()
         end
-
+        local value = itp(g[1])
+        for i = 2, #g do
+            local branch = g[i]
+            if itp(branch[1])(value) then
+                return itp(branch[2])
+            end
+        end
+        error("incomplite guard")
     end)
-}):inherit(std.HIGHER_ORDER)
+}):inherit(std.FUNCTIONAL)
+
+local LUA_VALUE = typeclass("lua_value")
+    :inherit(std.GUARD, std.LAMBDA, std.REAL)
+
+local _ = std._
+local c = std.c
+local coll = {}
+LUA_VALUE:match(
+    ~(std.guard(1)
+        | std.lambda(_.x, std.gt(_.x, 2)) >> 20
+        | std.lambda(_.x, std.ge(_.x, 1)) >> 10), coll)
+print(coll['@'])
 
 -- pattern matching
 
-std.PATTERN_MATCHING = typeclass("pattern_matching", {
-    caseof = CALLABLE:with_default(function(imp, itp, o)
-        ~(caseof(people)
-            | m(asdf) >> lambda
-            | m(asef) >> jioasdf)
-    end),
-})
-
-local case_mt = {}
-
 local match_mt = {
-    __shr = function(self, continuation)
-        return setmetatable(
-            {self[0], self[1], continuation}, case_mt)
+    __bor = function(self, branch)
+        assert(getmetatable(branch) == object and rawget(branch, 1) == "__shr",
+            "invalid branch for match")
+        self[#self+1] = rawget(branch, 2)
+        return self
+    end,
+    __bnot = function(self)
+        return object("match", self)
     end
 }
 
-local caseof_mt
-caseof_mt = {
-    __bor = function(self, case)
-        assert(getmetatable(case) == case_mt, "invalid case")
-        local new = {unpack(self)}
-        new[#new+1] = case
-        return setmetatable(new, caseof_mt)
-    end
-}
+std.match_mt = match_mt
 
-std.caseof = function(o)
-    return setmetatable({o})
+std.match = function(o)
+    return setmetatable({o}, match_mt)
 end
+
+
 
 return std
