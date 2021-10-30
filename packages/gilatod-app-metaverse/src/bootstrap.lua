@@ -12,8 +12,10 @@ local std = require("phale-std")
 local function load()
     local LUA_EXPRESSION = typeclass("lua_expression")
         :inherit(std.CONDITION, std.GUARD, std.TYPED_LAMBDA)
+
     local LUA_NUMBER = typeclass("lua_number")
         :inherit(std.REAL, LUA_EXPRESSION)
+
     local LUA = typeclass("lua")
         :inherit(LUA_NUMBER)
 
@@ -22,8 +24,8 @@ local function load()
     local coll = {}
     LUA:match(
         ~(std.guard(1)
-            | std.lambda(_.x ^ LUA_NUMBER, std.gt(_.x, 2)) >> 20
-            | std.lambda(_.x ^ LUA_NUMBER, std.ge(_.x, 1)) >> 10), coll)
+            | std.lambda(_.x, std.gt(_.x, 2)) >> 20
+            | std.lambda(_.x, std.ge(_.x, 1)) >> 10), coll)
     print(coll['@'])
 
     LUA:match(
@@ -37,3 +39,5 @@ coroutine.wrap(function()
         print(debug.traceback())
     end)
 end)()
+
+public the most puqweqq1234qer0987456568905666666667585678jghkghjkghjkvbnmvbnmpublic the most public

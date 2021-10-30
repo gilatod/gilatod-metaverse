@@ -381,14 +381,13 @@ std.TYPED_LAMBDA = typeclass("typed_lambda", {
 
             for i = 1, #arguments do
                 local arg = arguments[i]
-                if object.has_tag(arg, "__pow") then
-                    local decl = rawget(arg, 2)
+                if object.tag(arg) == "__pow" then
+                    local decl = object.arguments(arg)
                     local arg_t = itp(decl[2])
                     if not arg_t then
                         error(("invalid type for argument #%d")
                             :format(i))
                     end
-
                     local value = values[i]
                     local collec = {}
                     if not arg_t:match(value, collec) then
@@ -420,7 +419,7 @@ std.lambda = function(...)
     local tag = "lambda"
     for i = 1, #arguments do
         local arg = arguments[i]
-        if object.has_tag(arg, "__pow") then
+        if object.tag(arg) == "__pow" then
             tag = "typed_lambda"
             break
         end
@@ -455,9 +454,9 @@ end
 
 local guard_mt = {
     __bor = function(self, branch)
-        assert(object.has_tag(branch, "__shr"),
+        assert(object.tag(branch) == "__shr",
             "invalid branch for guard")
-        self[#self+1] = rawget(branch, 2)
+        self[#self+1] = object.arguments(branch)
         return self
     end,
     __bnot = function(self)
@@ -489,9 +488,9 @@ std.GUARD = typeclass("guard", {
 
 local match_mt = {
     __bor = function(self, branch)
-        assert(object.has_tag(branch, "__shr"),
+        assert(object.tag(branch) == "__shr",
             "invalid branch for match")
-        self[#self+1] = rawget(branch, 2)
+        self[#self+1] = object.arguments(branch)
         return self
     end,
     __bnot = function(self)
