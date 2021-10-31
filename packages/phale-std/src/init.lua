@@ -329,9 +329,62 @@ std.BINARY = typeclass("binary", {
         function(imp, itp, o1, o2) return itp(o1) >> itp(o2) end)
 })
 
--- functional
+-- first-class type
 
-std.FUNCTIONAL = typeclass("functional", {
+std.FIRST_CLASS_TYPE = typeclass("frist_class_type", {
+    [typeclass] = CALLABLE:with_default(
+        function(imp, itp, value) return value end),
+    [pattern] = CALLABLE:with_default(
+        function(imp, itp, value) return value end)
+})
+
+-- constructor
+
+std.constructed_mt = constructed_mt
+
+std.CONSTRUCTOR = typeclass("constructor", {
+    constructor = CALLABLE:with_default(function(imp, itp, name ...)
+        local arg_types = {...}
+        local constructor
+        constructor = function(...)
+            local args = {...}
+            for i = 1, #arg_types do
+                local arg_t = pattern.from(itp(arg_types[i]))
+                if not arg_t then
+                    error(("invalid constructor '%s': argument #%d has invalid type")
+                        :format(name, i))
+                end
+                local arg = args[i]
+                if not arg_t:match(arg) then
+                    error(("failed to call constructor '%s': invalid argument #%d (%s expected, got %s)")
+                        :format(name, i, arg_t, type(arg)))
+                end
+            end
+            return setmetatable({constructor, args}, constructed_mt)
+        end
+        return constructor
+    end)
+}):inherit(std.FIRST_CLASS_TYPE)
+
+std.C = setmetatable({}, {
+    __index = function(self, name)
+        return function(...)
+            return object("constructor", name, ...)
+        end
+    end
+})
+
+-- algebric datatype
+
+std.DATA = typeclass("data", {
+    data = CALLABLE:with_default(function(imp, itp, )
+        local MAYBE = data("maybe", _.just(NUMBER) | _.test(NUMBER, INT))
+    end)
+})
+
+-- first-class function
+
+std.FIRST_CLASS_FUNCTION = typeclass("first_class_function", {
     __call = CALLABLE:with_default(
         function(imp, itp, o, ...) return itp(o)(...) end),
 })
@@ -366,14 +419,9 @@ std.LAMBDA = typeclass("lambda", {
             env[key] = value
         end
     end)
-}):inherit(std.FUNCTIONAL)
+}):inherit(std.FIRST_CLASS_FUNCTION)
 
 std.TYPED_LAMBDA = typeclass("typed_lambda", {
-    [typeclass] = CALLABLE:with_default(
-        function(imp, itp, value) return value end),
-    [pattern] = CALLABLE:with_default(
-        function(imp, itp, value) return value end),
-
     typed_lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
         return function(...)
             local values = {...}
@@ -383,15 +431,15 @@ std.TYPED_LAMBDA = typeclass("typed_lambda", {
                 local arg = arguments[i]
                 if object.tag(arg) == "__pow" then
                     local decl = object.arguments(arg)
-                    local arg_t = itp(decl[2])
+                    local arg_t = pattern.from(itp(decl[2]))
                     if not arg_t then
-                        error(("invalid type for argument #%d")
+                        error(("invalid typed lambda: argument #%d has invalid type")
                             :format(i))
                     end
                     local value = values[i]
                     local collec = {}
                     if not arg_t:match(value, collec) then
-                        error(("invalid argument #%d (%s expected, got %s)")
+                        error(("failed to apply typed lambda: invalid argument #%d (%s expected, got %s)")
                             :format(i, arg_t, type(value)))
                     end
                     value = collec["@"] or value
@@ -408,7 +456,7 @@ std.TYPED_LAMBDA = typeclass("typed_lambda", {
             }, {__index = imp}))
         end
     end)
-}):inherit(std.LAMBDA)
+}):inherit(std.LAMBDA, std.FIRST_CLASS_TYPE)
 
 std.lambda = function(...)
     local count = select("#", ...)
@@ -424,7 +472,6 @@ std.lambda = function(...)
             break
         end
     end
-
     return object(tag, arguments, body)
 end
 
@@ -482,7 +529,7 @@ std.GUARD = typeclass("guard", {
         end
         error("incomplite guard")
     end)
-}):inherit(std.FUNCTIONAL)
+}):inherit(std.FIRST_CLASS_FUNCTION)
 
 -- pattern matching
 
