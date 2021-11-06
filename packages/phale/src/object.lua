@@ -24,7 +24,7 @@ function object:__index(k)
 end
 
 function object:__call(...)
-    return object("__call", {self, ...})
+    return object("__call", self, ...)
 end
 
 local function register_uniary(mt_func, tag)
@@ -73,6 +73,8 @@ object.arguments = function(obj)
         and rawget(obj, 2)
 end
 
+local tablex = require("meido.tablex")
+
 object.interpret = function(obj, interpreters)
     local function do_interpret(obj)
         local res
@@ -81,7 +83,9 @@ object.interpret = function(obj, interpreters)
                 or interpreters[type(obj)]
                 or interpreters["@"]
             if not lift then
-                error("failed to interpret object with raw type '"..type(obj).."'")
+                print(tablex.show(obj))
+                error(("failed to interpret object with type %s")
+                    :format(pattern.from_instance(obj) or type(obj)))
             end
             return lift(interpreters, do_interpret, obj)
         else

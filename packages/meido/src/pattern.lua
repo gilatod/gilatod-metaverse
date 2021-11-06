@@ -110,6 +110,7 @@ function require_pattern(p, text)
 end
 
 pattern.from = to_pattern
+pattern.from_instance = function(i) return to_pattern(getmetatable(i)) end
 pattern.require = require_pattern
 
 -- basic patterns

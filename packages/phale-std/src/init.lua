@@ -21,7 +21,7 @@ end
 
 -- show
 
-std.SHOW = typeclass("show", {
+std.Show = typeclass("Show", {
     show = CALLABLE:with_default(
         function(imp, itp, o) return tostring(itp(o)) end)
 })
@@ -43,7 +43,7 @@ end
 
 -- eq
 
-std.EQ = typeclass("eq", {
+std.Eq = typeclass("Eq", {
     eq = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) == itp(o2) end),
 })
@@ -54,7 +54,7 @@ end
 
 -- enum
 
-std.ENUM = typeclass("enum", {
+std.Enum = typeclass("Enum", {
     pred = CALLABLE:with_default(
         function(imp, itp, o) return itp(std.to_enum(std.from_enum(o) - 1)) end),
     succ = CALLABLE:with_default(
@@ -83,7 +83,7 @@ end
 
 -- bounded
 
-std.BOUNDED = typeclass("bounded", {
+std.Bounded = typeclass("Bounded", {
     max_bound = CALLABLE,
     min_bound = CALLABLE
 })
@@ -98,29 +98,30 @@ end
 
 -- additive group
 
-std.SEMIGROUP = typeclass("semigroup", {
+std.Semigroup = typeclass("Semigroup", {
     __add = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) + itp(o2) end)
 })
 
-std.MONOID = typeclass("monoid", {
+std.Monoid = typeclass("Monoid", {
     number = CALLABLE:with_default(function(imp, itp, value)
         if value == 0 then
             return itp(std.unit)
         end
+        error("invalid monoid")
     end),
     unit = CALLABLE:with_default(
         function(imp, itp) return 0 end)
-}):inherit(std.SEMIGROUP)
+}):inherit(std.Semigroup)
 
 std.unit = object("unit")
 
-std.GROUP = typeclass("group", {
+std.Group = typeclass("Group", {
     __unm = CALLABLE:with_default(
         function(imp, itp, o) return -itp(o) end),
     __sub = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) - itp(o2) end)
-}):inherit(std.MONOID)
+}):inherit(std.Monoid)
 
 std.inverse = function(o)
     return -o
@@ -128,29 +129,30 @@ end
 
 -- multiplicative group
 
-std.MUL_SEMIGROUP = typeclass("mul_semigroup", {
+std.MulSemigroup = typeclass("MulSemigroup", {
     __mul = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) * itp(o2) end)
 })
 
-std.MUL_MONOID = typeclass("mul_monoid", {
+std.MulMonoid = typeclass("MulMonoid", {
     number = CALLABLE:with_default(function(imp, itp, value)
         if value == 1 then
             return itp(std.munit)
         end
+        error("invalid multiplicative monoid")
     end),
     munit = CALLABLE:with_default(
         function(imp, itp) return 1 end)
-}):inherit(std.MUL_SEMIGROUP)
+}):inherit(std.MulSemigroup)
 
 std.munit = object("munit")
 
-std.MUL_GROUP = typeclass("mul_group", {
+std.MulGroup = typeclass("MulGroup", {
     minverse = CALLABLE:with_default(
         function(imp, itp, o) return 1 / itp(o) end),
     __div = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) / itp(o2) end)
-}):inherit(std.MUL_MONOID)
+}):inherit(std.MulMonoid)
 
 std.minverse = function(o)
     return object("minverse", o)
@@ -158,25 +160,26 @@ end
 
 -- ring
 
-std.SEMIRING = typeclass("semiring", {
+std.Semiring = typeclass("Semiring", {
     number = CALLABLE:with_default(function(imp, itp, value)
         if value == 0 then
             return itp(std.unit)
         elseif value == 1 then
             return itp(std.munit)
         end
+        error("invalid semiring")
     end)
-}):inherit(std.MONOID, std.MUL_MONOID)
+}):inherit(std.Monoid, std.MulMonoid)
 
-std.RING = typeclass("ring")
-    :inherit(std.SEMIRING, std.GROUP)
+std.Ring = typeclass("Ring")
+    :inherit(std.Semiring, std.Group)
 
-std.FIELD = typeclass("field")
-    :inherit(std.RING, std.MUL_GROUP)
+std.Field = typeclass("Field")
+    :inherit(std.Ring, std.MulGroup)
 
 -- order
 
-std.POSET = typeclass("poset", {
+std.Poset = typeclass("Poset", {
     le = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) <= itp(o2) end),
     gt = CALLABLE:with_default(
@@ -191,59 +194,59 @@ std.gt = function(o1, o2)
     return object("gt", o1, o2)
 end
 
-std.STRICT_POSET = typeclass("strict_poset", {
-    ge = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) >= itp(o2) end),
+std.StrictPoset = typeclass("StrictPoset", {
     lt = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) < itp(o2) end)
+        function(imp, itp, o1, o2) return itp(o1) < itp(o2) end),
+    ge = CALLABLE:with_default(
+        function(imp, itp, o1, o2) return itp(o1) >= itp(o2) end)
 })
-
-std.ge = function(o1, o2)
-    return object("ge", o1, o2)
-end
 
 std.lt = function(o1, o2)
     return object("lt", o1, o2)
 end
 
-std.ORD = typeclass("ord")
-    :inherit(std.EQ, std.POSET, std.STRICT_POSET)
+std.ge = function(o1, o2)
+    return object("ge", o1, o2)
+end
+
+std.Ord = typeclass("Ord")
+    :inherit(std.Eq, std.Poset, std.StrictPoset)
 
 -- lattice
 
-std.MEET_SEMILATTICE = typeclass("meet_semilattice", {
+std.MeetSemilattice = typeclass("MeetSemilattice", {
     meet = CALLABLE:with_default(function(imp, itp, o1, o2)
         o1 = itp(o1)
         o2 = itp(o2)
         return o1 >= o2 and o1 or o2
     end)
-}):inherit(std.POSET)
+}):inherit(std.Poset)
 
 std.meet = function(o1, o2)
     return object("meet", o1, o2)
 end
 
-std.JOIN_SEMILATTICE = typeclass("join_semilattice", {
+std.JoinSemilattice = typeclass("JoinSemilattice", {
     join = CALLABLE:with_default(function(imp, itp, o1, o2)
         o1 = itp(o1)
         o2 = itp(o2)
         return o1 >= o2 and o2 or o1
     end)
-}):inherit(std.POSET)
+}):inherit(std.Poset)
 
 std.join = function(o1, o2)
     return object("join", o1, o2)
 end
 
-std.LATTICE = typeclass("lattice")
-    :inherit(std.MEET_SEMILATTICE, std.JOIN_SEMILATTICE)
+std.Lattice = typeclass("Lattice")
+    :inherit(std.MeetSemilattice, std.JoinSemilattice)
 
-std.BOUNDED_LATTICE = typeclass("bounded_lattice")
-    :inherit(std.LATTICE, std.BOUNDED)
+std.BoundedLattice = typeclass("BoundedLattice")
+    :inherit(std.Lattice, std.Bounded)
 
-std.COMPLEMENTED_LATTICE = typeclass("complemented_lattice", {
+std.ComplementedLattice = typeclass("ComplementedLattice", {
     complement = CALLABLE
-}):inherit(std.BOUNDED_LATTICE)
+}):inherit(std.BoundedLattice)
 
 std.complement = function(o)
     return object("complement", o)
@@ -251,7 +254,7 @@ end
 
 -- signed
 
-std.SIGNED = typeclass("signed", {
+std.Signed = typeclass("Signed", {
     abs = CALLABLE:with_default(
         function(imp, itp, o) return math.abs(itp(o)) end),
     signum = CALLABLE:with_default(
@@ -268,25 +271,25 @@ end
 
 -- number
 
-std.NUMBER = typeclass("number", {
+std.Number = typeclass("Number", {
     number = CALLABLE:with_default(
         function(imp, itp, value) return value end)
-}):inherit(std.RING, std.SIGNED, std.EQ)
+}):inherit(std.Ring, std.Signed, std.Eq)
 
-std.REAL = typeclass("real")
-    :inherit(std.NUMBER, std.ORD)
+std.Real = typeclass("Real")
+    :inherit(std.Number, std.Ord)
 
-std.INTEGRAL = typeclass("integral", {
+std.Integral = typeclass("Integral", {
     __idiv = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) // itp(o2) end),
     __mod = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) % itp(o2) end)
-}):inherit(std.REAL, std.ENUM)
+}):inherit(std.Real, std.Enum)
 
-std.FRACTIONAL = typeclass("fractional")
-    :inherit(std.NUMBER, std.FIELD)
+std.Fractional = typeclass("Fractional")
+    :inherit(std.Number, std.Field)
 
-std.FLOATING = typeclass("floating", {
+std.Floating = typeclass("Floating", {
     __pow = CALLABLE:with_default(
         function(imp, itp, o1, o2) return itp(o1) ^ itp(o2) end),
     exp = CALLABLE, sqrt = CALLABLE, log = CALLABLE, log_base = CALLABLE,
@@ -295,25 +298,45 @@ std.FLOATING = typeclass("floating", {
     cosh = CALLABLE, asinh = CALLABLE, atanh = CALLABLE, acosh = CALLABLE,
 })
 
-std.REAL_FRAC = typeclass("real_frac", {
+std.RealFrac = typeclass("RealFrac", {
     proper_fraction = CALLABLE,
     truncate = CALLABLE,
     round = CALLABLE,
     ceiling = CALLABLE,
     floor = CALLABLE
-}):inherit(std.REAL, std.FRACTIONAL)
+}):inherit(std.Real, std.Fractional)
 
-std.REAL_FLOAT = typeclass("real_float", {
+std.RealFloat = typeclass("RealFloat", {
     float_range = CALLABLE,
     is_NaN = CALLABLE,
     is_infinite = CALLABLE,
     is_nagative_zero = CALLABLE,
     atan2 = CALLABLE
-}):inherit(std.FLOATING, std.REAL_FRAC)
+}):inherit(std.Floating, std.RealFrac)
+
+-- boolean
+
+std.Boolean = typeclass("Boolean", {
+    boolean = CALLABLE:with_default(
+        function(imp, itp, value) return value end),
+    
+    __and = CALLABLE:with_default(
+        function(imp, itp, o1, o2) return itp(o1) and itp(o2) end),
+    __or = CALLABLE:with_default(
+        function(imp, itp, o1, o2) return itp(o1) or itp(o2) end)
+})
+
+std.__and = function(o1, o2)
+    return object("__and", o1, o2)
+end
+
+std.__or = function(o1, o2)
+    return object("__or", o1, o2)
+end
 
 -- binary
 
-std.BINARY = typeclass("binary", {
+std.Binary = typeclass("Binary", {
     __bnot = CALLABLE:with_default(
         function(imp, itp, o) return ~itp(o) end),
     __band = CALLABLE:with_default(
@@ -331,74 +354,85 @@ std.BINARY = typeclass("binary", {
 
 -- first-class type
 
-std.FIRST_CLASS_TYPE = typeclass("frist_class_type", {
+std.Type = typeclass("Type", {
     [typeclass] = CALLABLE:with_default(
         function(imp, itp, value) return value end),
     [pattern] = CALLABLE:with_default(
         function(imp, itp, value) return value end)
 })
 
--- constructor
+-- tuple
 
-std.constructed_mt = constructed_mt
+local tuple = setmetatable({}, {
+    __call = function(self, name, ...)
+        guard.string("name", name)
 
-std.CONSTRUCTOR = typeclass("constructor", {
-    constructor = CALLABLE:with_default(function(imp, itp, name ...)
-        local arg_types = {...}
-        local constructor
-        constructor = function(...)
-            local args = {...}
-            for i = 1, #arg_types do
-                local arg_t = pattern.from(itp(arg_types[i]))
-                if not arg_t then
-                    error(("invalid constructor '%s': argument #%d has invalid type")
-                        :format(name, i))
-                end
-                local arg = args[i]
-                if not arg_t:match(arg) then
-                    error(("failed to call constructor '%s': invalid argument #%d (%s expected, got %s)")
-                        :format(name, i, arg_t, type(arg)))
-                end
-            end
-            return setmetatable({constructor, args}, constructed_mt)
+        local tuple = {}
+        tuple[1] = pattern.meta(name, tuple)
+        tuple[2] = {...}
+
+        return setmetatable(tuple, self)
+    end
+})
+tuple.__index = tuple
+
+function tuple:to_pattern()
+    return self[1]
+end
+
+function tuple:__call(...)
+    return object("tuple_instance", self, ...)
+end
+
+function tuple:guard(itp, args)
+    local arg_types = self[2]
+    for i = 2, #arg_types do
+        local arg_t = pattern.from(itp(arg_types[i]))
+        if not arg_t then
+            error(("invalid tuple '%s': argument #%d has invalid type")
+                :format(self.name, i))
         end
-        return constructor
-    end)
-}):inherit(std.FIRST_CLASS_TYPE)
+        local arg = args[i - 1]
+        if not arg_t:match(arg) then
+            error(("failed to instantiate tuple '%s': invalid argument #%d (%s expected, got %s)")
+                :format(name, i, arg_t, pattern.from_instance(arg) or type(arg)))
+        end
+    end
+end
 
-std.C = setmetatable({}, {
+std.tuple = tuple
+
+std.Tuple = typeclass("Tuple", {
+    [tuple] = CALLABLE:with_default(
+        function(imp, itp, tuple) return tuple end),
+
+    tuple_instance = CALLABLE:with_default(function(imp, itp, tuple, ...)
+        local args = {...}
+        tuple:guard(itp, args)
+        return setmetatable(args, tuple)
+    end),
+}):inherit(std.Type)
+
+std.T = setmetatable({}, {
     __index = function(self, name)
         return function(...)
-            return object("constructor", name, ...)
+            return tuple(name, ...)
         end
     end
 })
 
 -- algebric datatype
 
-std.DATA = typeclass("data", {
-    data = CALLABLE:with_default(function(imp, itp, )
-        local MAYBE = data("maybe", _.just(NUMBER) | _.test(NUMBER, INT))
-    end)
-})
-
 -- first-class function
 
-std.FIRST_CLASS_FUNCTION = typeclass("first_class_function", {
+std.Function = typeclass("Function", {
     __call = CALLABLE:with_default(
         function(imp, itp, o, ...) return itp(o)(...) end),
 })
 
 -- lambda
 
-local function set_argument(itp, env, arg, value)
-    local succ, info = pcall(itp(arg), env, value)
-    if not succ then
-        error("invalid argument at #"..i..": "..info)
-    end
-end
-
-std.LAMBDA = typeclass("lambda", {
+std.Lambda = typeclass("Lambda", {
     lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
         return function(...)
             local values = {...}
@@ -419,33 +453,45 @@ std.LAMBDA = typeclass("lambda", {
             env[key] = value
         end
     end)
-}):inherit(std.FIRST_CLASS_FUNCTION)
+}):inherit(std.Function)
 
-std.TYPED_LAMBDA = typeclass("typed_lambda", {
-    typed_lambda = CALLABLE:with_default(function(imp, itp, arguments, body)
+local function match_lambda_argument(i, arg, arg_t)
+    arg_t = pattern.from(arg_t)
+    if not arg_t then
+        error(("invalid typed lambda: argument #%d has invalid type")
+            :format(i))
+    end
+    local collec = {}
+    if not arg_t:match(arg, collec) then
+        error(("failed to apply typed lambda: invalid argument #%d (%s expected, got %s)")
+            :format(i, arg_t, pattern.from_instance(arg) or type(arg)))
+    end
+    return collec["@"] or arg
+end
+
+std.match_lambda_argument = match_lambda_argument
+
+local function set_argument(itp, env, decl, value)
+    local succ, info = pcall(itp(decl), env, value)
+    if not succ then
+        error("invalid argument at #"..i..": "..info)
+    end
+end
+
+std.TypedLambda = typeclass("TypedLambda", {
+    typed_lambda = CALLABLE:with_default(function(imp, itp, decls, body)
         return function(...)
             local values = {...}
             local env = {}
 
-            for i = 1, #arguments do
-                local arg = arguments[i]
-                if object.tag(arg) == "__pow" then
-                    local decl = object.arguments(arg)
-                    local arg_t = pattern.from(itp(decl[2]))
-                    if not arg_t then
-                        error(("invalid typed lambda: argument #%d has invalid type")
-                            :format(i))
-                    end
-                    local value = values[i]
-                    local collec = {}
-                    if not arg_t:match(value, collec) then
-                        error(("failed to apply typed lambda: invalid argument #%d (%s expected, got %s)")
-                            :format(i, arg_t, type(value)))
-                    end
-                    value = collec["@"] or value
-                    set_argument(itp, env, decl[1], value)
+            for i = 1, #decls do
+                local decl = decls[i]
+                if object.tag(decl) == "__pow" then
+                    decl = object.arguments(decl)
+                    local arg = match_lambda_argument(i, values[i], itp(decl[2]))
+                    set_argument(itp, env, decl[1], arg)
                 else
-                    set_argument(itp, env, arg, itp(values[i]))
+                    set_argument(itp, env, decl, itp(values[i]))
                 end
             end
 
@@ -456,7 +502,7 @@ std.TYPED_LAMBDA = typeclass("typed_lambda", {
             }, {__index = imp}))
         end
     end)
-}):inherit(std.LAMBDA, std.FIRST_CLASS_TYPE)
+}):inherit(std.Lambda, std.Type)
 
 std.lambda = function(...)
     local count = select("#", ...)
@@ -483,55 +529,51 @@ std._ = setmetatable({}, {
 
 -- condition
 
-std.CONDITION = typeclass("condition", {
-    cond = CALLABLE:with_default(function(imp, itp, o, true_condition, false_condition)
-        if itp(o) then
-            return itp(true_condition)
-        else
-            return itp(false_condition)
-        end
-    end)
-})
-
-std.cond = function(o, true_condition, false_condition)
-    return object("cond", o, true_condition, false_condition)
-end
-
--- guard
-
-local guard_mt = {
+local cond_mt = {
     __bor = function(self, branch)
         assert(object.tag(branch) == "__shr",
-            "invalid branch for guard")
+            "invalid branch for cond")
         self[#self+1] = object.arguments(branch)
         return self
     end,
     __bnot = function(self)
-        return object("guard", self)
+        return object("cond", self)
     end
 }
 
-std.guard_mt = guard_mt
+std.cond_mt = cond_mt
 
-std.guard = function(o)
-    return setmetatable({o}, guard_mt)
-end
+std.Condition = typeclass("Condition", {
+    if_ = CALLABLE:with_default(function(imp, itp, o, true_branch, false_branch)
+        if itp(o) then
+            return itp(true_branch)
+        else
+            return itp(false_branch)
+        end
+    end),
 
-std.GUARD = typeclass("guard", {
-    guard = CALLABLE:with_default(function(imp, itp, g)
-        assert(getmetatable(g) == guard_mt, "invalid guard")
-        local value = g[1]
-        for i = 2, #g do
-            local branch = g[i]
+    cond = CALLABLE:with_default(function(imp, itp, c)
+        assert(getmetatable(c) == cond_mt, "invalid cond")
+        local value = itp(c[1])
+        for i = 2, #c do
+            local branch = c[i]
             if itp(branch[1])(value) then
                 return itp(branch[2])
             end
         end
-        error("incomplite guard")
+        error("incomplite cond")
     end)
-}):inherit(std.FIRST_CLASS_FUNCTION)
+})
 
--- pattern matching
+std.if_ = function(o, true_branch, false_branch)
+    return object("if_", o, true_branch, false_branch)
+end
+
+std.cond = function(o)
+    return setmetatable({o}, cond_mt)
+end
+
+-- patern matching
 
 local match_mt = {
     __bor = function(self, branch)
@@ -545,7 +587,22 @@ local match_mt = {
     end
 }
 
-std.match_mt = match_mt
+std.PatternMatching = typeclass("PatternMatching", {
+    match = CALLABLE:with_default(function(imp, itp, m)
+        assert(getmetatable(m) == match_mt, "invalid match")
+        local value = itp(m[1])
+        for i = 2, #m do
+            local branch = m[i]
+            local succ, res = pcall(itp, std.lambda(branch[1], branch[2]))
+            if succ then
+                return itp(branch[2])
+            elseif not res:match("failed to apply typed lambda") then
+                error(res, 0)
+            end
+        end
+        error("incomplite guard")
+    end)
+}):inherit(std.Function)
 
 std.match = function(o)
     return setmetatable({o}, match_mt)

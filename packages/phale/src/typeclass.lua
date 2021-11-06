@@ -65,6 +65,7 @@ setmetatable(typeclass, {
                 end
                 local succ, res = pcall(interpret, v, defaults)
                 if not succ then
+                    print(res)
                     if not res:match("failed to interpret object") then
                         error(res, 0)
                     end
