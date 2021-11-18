@@ -62,13 +62,13 @@ register_binary("__shl", "__shl")
 register_binary("__shr", "__shr")
 
 object.tag = function(obj)
-    return getmetatable(obj) == object
-        and rawget(obj, 1)
+    assert(getmetatable(obj) == object, "invalid object")
+    return rawget(obj, 1)
 end
 
 object.arguments = function(obj)
-    return getmetatable(obj) == object
-        and rawget(obj, 2)
+    assert(getmetatable(obj) == object, "invalid object")
+    return rawget(obj, 2)
 end
 
 object.interpret = function(obj, interpreters)
