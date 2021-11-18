@@ -1,11 +1,12 @@
 {
-    "name": "phale-std",
+    "name": "phale-lua",
     "version": "1.0.0",
-    "description": "Standard typeclasses for Phale.",
+    "description": "Lua compiler for Phale.",
     "authors": "Phlam Sicusa",
     "main": "src/init.lua",
     "dependencies": {
         "meido": "^1.0.0",
-        "phale": "^1.0.0"
+        "phale": "^1.0.0",
+        "phale-std": "^1.0.0"
     }
 }

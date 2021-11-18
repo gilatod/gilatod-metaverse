@@ -80,9 +80,9 @@ function pattern:match(value, collection, stack)
     end
 end
 
-function pattern:guard(name, value)
+function pattern:guard(name, value, level)
     if not self:match(value) then
-        error(name.." must be "..self.desc_func(), 2)
+        error(name.." must be "..self.desc_func(), level or 2)
     end
 end
 

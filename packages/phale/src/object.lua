@@ -18,9 +18,7 @@ setmetatable(object, {
 })
 
 function object:__index(k)
-    local obj = object("__index", self, k)
-    rawset(self, k, obj)
-    return obj
+    return object("__index", self, k)
 end
 
 function object:__call(...)
@@ -73,8 +71,6 @@ object.arguments = function(obj)
         and rawget(obj, 2)
 end
 
-local tablex = require("meido.tablex")
-
 object.interpret = function(obj, interpreters)
     local function do_interpret(obj)
         local res
@@ -83,7 +79,6 @@ object.interpret = function(obj, interpreters)
                 or interpreters[type(obj)]
                 or interpreters["@"]
             if not lift then
-                print(tablex.show(obj))
                 error(("failed to interpret object with type %s")
                     :format(pattern.from_instance(obj) or type(obj)))
             end

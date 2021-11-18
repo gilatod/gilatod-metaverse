@@ -16,6 +16,7 @@ local typeclass = {}
 
 setmetatable(typeclass, {
     __index = pattern.meta("phale.typeclass", typeclass),
+    __tostring = function() return "%phale.typeclass" end,
     __call = function(self, name, pats)
         guard.string("name", name)
 
@@ -61,20 +62,16 @@ setmetatable(typeclass, {
             function() return name end,
             function(v, c, s)
                 if not instance.full then
-                    return false
+                    error(("typeclass %s is not full"):format(name))
                 end
-                local succ, res = pcall(interpret, v, defaults)
-                if not succ then
-                    print(res)
-                    if not res:match("failed to interpret object") then
-                        error(res, 0)
-                    end
-                else
-                    if c then c["@"] = res end
-                    return true
-                end
+                local res = interpret(v, defaults)
+                if c then c["@"] = res end
+                return true
             end)
 
+        function instance:get_defaults() return self.defaults end
+        function instance:is_full() return self.full end
+        function instance:to_pattern() return self.pattern end
         function instance:has_default() return false end
         function instance:get_description() return self.pattern:get_description() end
         function instance:match(v, c, s) return self.pattern:match(v, c, s) end
@@ -85,17 +82,7 @@ setmetatable(typeclass, {
 })
 typeclass.__index = typeclass
 
-function typeclass:__tostring()
-    return tostring(self.pattern)
-end
-
-function typeclass:to_pattern()
-    return self.pattern
-end
-
-function typeclass:is_full()
-    return self.full
-end
+function typeclass:__tostring() return tostring(self.pattern) end
 
 local function for_patterns(tc, f)
     local parents = tc.parents
@@ -122,7 +109,9 @@ local function update_full(tc)
     local defaults = tc.defaults
     tc.full = pcall(for_patterns, tc,
         function(key, pat)
-            if not defaults[key] then error() end
+            if not defaults[key] and not pat:match(nil) then
+                error()
+            end
         end)
     local children = tc.children
     for i = 1, #children do
@@ -152,7 +141,7 @@ function typeclass:instantiate(name, arguments)
     end
 
     for_patterns(self, function(key, pat)
-        if not defaults[key] then
+        if not defaults[key] and not pat:match(nil) then
             error(("failed to instantiate %s (%s : %s expected)")
                 :format(self, key, pat), 5)
         end
@@ -169,7 +158,7 @@ function typeclass:inherit(...)
 
     for i = 1, select("#", ...) do
         local tc = tcs[i]
-        typeclass:guard("argument", tc)
+        typeclass:guard("argument", tc, 3)
         parents[#parents+1] = tc
         local children = tc.children
         children[#children+1] = self
