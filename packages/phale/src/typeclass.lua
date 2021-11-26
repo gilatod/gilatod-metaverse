@@ -40,29 +40,30 @@ setmetatable(typeclass, {
             defaults = defaults
         }
 
-        local full = true
+        local complete = true
         if pats then
             guard.table("patterns", pats)
             for key, pat in pairs(pats) do
                 local pat = pattern.from(pat)
                 if pat == nil then
-                    error("invalid field: "..key)
+                    error(("invalid field for %s: %s")
+                        :format(name, key))
                 elseif pat:has_default() then
                     defaults[key] = pat:get_default()
                 else
-                    full = false
+                    complete = false
                 end
                 patterns[key] = pat
             end
         end
-        instance.full = full
+        instance.complete = complete
 
         instance.pattern = pattern(
             "phale.typeclass", NO_DEFAULT,
             function() return name end,
             function(v, c, s)
-                if not instance.full then
-                    error(("typeclass %s is not full"):format(name))
+                if not instance.complete then
+                    error(("typeclass %s is not complete"):format(name))
                 end
                 local res = interpret(v, defaults)
                 if c then c["@"] = res end
@@ -70,7 +71,7 @@ setmetatable(typeclass, {
             end)
 
         function instance:get_defaults() return self.defaults end
-        function instance:is_full() return self.full end
+        function instance:is_complete() return self.complete end
         function instance:to_pattern() return self.pattern end
         function instance:has_default() return false end
         function instance:get_description() return self.pattern:get_description() end
@@ -105,9 +106,9 @@ local function find_pattern(tc, key)
     end
 end
 
-local function update_full(tc)
+local function update_complete(tc)
     local defaults = tc.defaults
-    tc.full = pcall(for_patterns, tc,
+    tc.complete = pcall(for_patterns, tc,
         function(key, pat)
             if not defaults[key] and not pat:match(nil) then
                 error()
@@ -115,7 +116,7 @@ local function update_full(tc)
         end)
     local children = tc.children
     for i = 1, #children do
-        update_full(children[i])
+        update_complete(children[i])
     end
 end
 
@@ -164,7 +165,7 @@ function typeclass:inherit(...)
         children[#children+1] = self
     end
 
-    update_full(self)
+    update_complete(self)
     return self
 end
 

@@ -28,14 +28,72 @@ local function chain(tag, ...)
     return exp
 end
 
+-- lift
+
+std.Lift = typeclass("Lift", {
+    lift = CALLABLE:with_default(
+        function(imp, itp, value) return itp(value) end)
+})
+
+std.lift = function(value)
+    return object("lift", value)
+end
+
+-- empty typeclass
+
+std.Empty = typeclass("Empty")
+
 -- first-class type
 
 std.Type = typeclass("Type", {
     [typeclass] = CALLABLE:with_default(
-        function(imp, itp, value) return value end),
-    [pattern] = CALLABLE:with_default(
         function(imp, itp, value) return value end)
 })
+
+-- typeclass family
+
+local typeclass_family = setmetatable({}, {
+    __call = function(self, name)
+        local instance = {name = name}
+        return setmetatable(instance, self)
+    end
+})
+std.typeclass_family = typeclass_family
+typeclass_family.__index = typeclass_family
+
+function typeclass_family:__tostring()
+    return self.name
+end
+
+local typeclass_instance = {}
+std.typeclass_instance = typeclass_instance
+typeclass_instance.__index = typeclass_instance
+
+function typeclass_instance:get_family()
+    return self[1]
+end
+
+function typeclass_instance:get_arguments()
+    return self[2]
+end
+
+function typeclass_family:__call(...)
+    local args = {...}
+    return setmetatable({self, args}, typeclass_instance)
+end
+
+std.TypeclassFamily = typeclass("TypeclassFamily", {
+    [typeclass_instance] = CALLABLE:with_default(function(imp, itp, instance)
+        local family = instance:get_family()
+        local family_interpreter = imp[family]
+        if not family_interpreter then
+            return Empty
+        else
+            local args = instance:get_arguments()
+            return family_interpreter(imp, itp, unpack(args))
+        end
+    end)
+}):inherit(std.Type)
 
 -- first-class function
 
@@ -97,13 +155,13 @@ local function match_lambda_argument(env, arg, arg_t)
     if getmetatable(arg_t) ~= typeclass then
         error("invalid typed lambda: invalid type")
     end
-    local defaults = arg_t:get_defaults()
+    local itps = arg_t:get_defaults()
     if env then
-        defaults = setmetatable({env = env}, {__index = defaults})
+        itps = setmetatable({env = env}, {__index = itps})
     end
-    local succ, res = pcall(interpret, arg, defaults)
+    local succ, res = pcall(interpret, arg, itps)
     if not succ then
-        error(("failed to apply typed lambda: invalid argument (%s expected, got %s) \n  > %s")
+        error(("failed to apply typed lambda: invalid argument (%s expected, got %s)\n\t> %s")
             :format(arg_t, pattern.from_instance(arg) or type(arg), res))
     end
     return res
@@ -140,7 +198,7 @@ std.TypedLambda = typeclass("TypedLambda", {
             end
         end
     end)
-}):inherit(std.Lambda, std.Type)
+}):inherit(std.Lambda)
 
 std._ = setmetatable({}, {
     __index = function(self, key)
@@ -192,7 +250,7 @@ end
 local lambda = std.lambda
 local _ = std._
 
--- FixedPoint
+-- fixed point
 
 std.FixedPoint = typeclass("FixedPoint", {
     fix = CALLABLE:with_default(function(imp, itp, f)
@@ -211,18 +269,26 @@ end
 
 -- condition
 
+local cases_mt = {
+    __bor = function(self, branch)
+        assert(object.tag(branch) == "__shr",
+            "invalid branch for cases")
+        local new = {unpack(self)}
+        new[#new+1] = object.arguments(branch)
+        return setmetatable(new, std.cases_mt)
+    end
+}
+std.cases_mt = cases_mt
+
 local cond_mt = {
     __bor = function(self, branch)
         assert(object.tag(branch) == "__shr",
             "invalid branch for cond")
-        self[#self+1] = object.arguments(branch)
-        return self
-    end,
-    __bnot = function(self)
-        return object("cond", self)
+        local new = {unpack(self)}
+        new[#new+1] = object.arguments(branch)
+        return setmetatable(new, std.cond_mt)
     end
 }
-
 std.cond_mt = cond_mt
 
 std.Condition = typeclass("Condition", {
@@ -234,8 +300,7 @@ std.Condition = typeclass("Condition", {
         end
     end),
 
-    cond = CALLABLE:with_default(function(imp, itp, c)
-        assert(getmetatable(c) == cond_mt, "invalid cond")
+    [cases_mt] = CALLABLE:with_default(function(imp, itp, c)
         local value = itp(c[1])
         for i = 2, #c do
             local branch = c[i]
@@ -243,21 +308,27 @@ std.Condition = typeclass("Condition", {
                 return itp(branch[2])
             end
         end
-        error("incomplite cond")
+    end),
+
+    [cond_mt] = CALLABLE:with_default(function(imp, itp, c)
+        for i = 1, #c do
+            local branch = c[i]
+            if itp(branch[1]) then
+                return itp(branch[2])
+            end
+        end
     end)
 })
-
---[[
-std.if_ = lambda(_.o, _.true_branch, _.false_branch,
-    object("if_", _.o, _.true_branch, _.false_branch))]]
 
 std.if_ = function(o, true_branch, false_branch)
     return object("if_", o, true_branch, false_branch)
 end
 
-std.cond = function(o)
-    return setmetatable({o}, cond_mt)
+std.cases = function(o)
+    return setmetatable({o}, cases_mt)
 end
+
+std.cond = setmetatable({}, cond_mt)
 
 -- patern matching
 
@@ -297,7 +368,7 @@ end
 -- core language
 
 std.Core = typeclass("Core")
-    :inherit(std.TypedLambda, std.FixedPoint, std.Condition)
+    :inherit(std.Lift, std.TypedLambda, std.FixedPoint, std.Condition)
 
 -- show
 
@@ -320,27 +391,22 @@ std.read = lambda(_.s, object("read", _.s))
 
 std.Eq = typeclass("Eq", {
     eq = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) == itp(o2) end),
+        function(imp, itp, a, b) return itp(a) == itp(b) end),
 })
 
-std.eq = lambda(_.o1, _.o2, object("eq", _.o1, _.o2))
+std.eq = lambda(_.a, _.b, object("eq", _.a, _.b))
 
 -- enum
 
 std.Enum = typeclass("Enum", {
     pred = CALLABLE:with_default(
-        function(imp, itp, o) return itp(std.to_enum(std.from_enum(o) - 1)) end),
+        function(imp, itp, o) return o - 1 end),
     succ = CALLABLE:with_default(
-        function(imp, itp, o) return itp(std.to_enum(std.from_enum(o) + 1)) end),
-
-    to_enum = CALLABLE,
-    from_enum = CALLABLE
+        function(imp, itp, o) return o + 1 end)
 })
 
 std.pred = lambda(_.o, object("pred", _.o))
 std.succ = lambda(_.o, object("succ", _.o))
-std.to_enum = lambda(_.n, object("to_enum", _.n))
-std.from_enum = lambda(_.o, object("from_enum", _.o))
 
 -- bounded
 
@@ -356,7 +422,7 @@ std.min_bound = lambda(_.o, object("min_bound", _.o))
 
 std.Semigroup = typeclass("Semigroup", {
     __add = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) + itp(o2) end)
+        function(imp, itp, a, b) return itp(a) + itp(b) end)
 })
 
 std.Monoid = typeclass("Monoid", {
@@ -376,7 +442,7 @@ std.Group = typeclass("Group", {
     __unm = CALLABLE:with_default(
         function(imp, itp, o) return -itp(o) end),
     __sub = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) - itp(o2) end)
+        function(imp, itp, a, b) return itp(a) - itp(b) end)
 }):inherit(std.Monoid)
 
 std.inverse = lambda(_.o, -_.o)
@@ -385,7 +451,7 @@ std.inverse = lambda(_.o, -_.o)
 
 std.MulSemigroup = typeclass("MulSemigroup", {
     __mul = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) * itp(o2) end)
+        function(imp, itp, a, b) return itp(a) * itp(b) end)
 })
 
 std.MulMonoid = typeclass("MulMonoid", {
@@ -405,7 +471,7 @@ std.MulGroup = typeclass("MulGroup", {
     minverse = CALLABLE:with_default(
         function(imp, itp, o) return 1 / itp(o) end),
     __div = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) / itp(o2) end)
+        function(imp, itp, a, b) return itp(a) / itp(b) end)
 }):inherit(std.MulMonoid)
 
 std.minverse = lambda(_.o, object("minverse", _.o))
@@ -433,23 +499,23 @@ std.Field = typeclass("Field")
 
 std.Poset = typeclass("Poset", {
     le = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) <= itp(o2) end),
+        function(imp, itp, a, b) return itp(a) <= itp(b) end),
     gt = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) > itp(o2) end)
+        function(imp, itp, a, b) return itp(a) > itp(b) end)
 })
 
-std.le = lambda(_.o1, _.o2, object("le", _.o1, _.o2))
-std.gt = lambda(_.o1, _.o2, object("gt", _.o1, _.o2))
+std.le = lambda(_.a, _.b, object("le", _.a, _.b))
+std.gt = lambda(_.a, _.b, object("gt", _.a, _.b))
 
 std.StrictPoset = typeclass("StrictPoset", {
     lt = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) < itp(o2) end),
+        function(imp, itp, a, b) return itp(a) < itp(b) end),
     ge = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) >= itp(o2) end)
+        function(imp, itp, a, b) return itp(a) >= itp(b) end)
 })
 
-std.lt = lambda(_.o1, _.o2, object("lt", _.o1, _.o2))
-std.ge = lambda(_.o1, _.o2, object("ge", _.o1, _.o2))
+std.lt = lambda(_.a, _.b, object("lt", _.a, _.b))
+std.ge = lambda(_.a, _.b, object("ge", _.a, _.b))
 
 std.Ord = typeclass("Ord")
     :inherit(std.Eq, std.Poset, std.StrictPoset)
@@ -457,24 +523,24 @@ std.Ord = typeclass("Ord")
 -- lattice
 
 std.MeetSemilattice = typeclass("MeetSemilattice", {
-    meet = CALLABLE:with_default(function(imp, itp, o1, o2)
-        o1 = itp(o1)
-        o2 = itp(o2)
-        return o1 >= o2 and o1 or o2
+    meet = CALLABLE:with_default(function(imp, itp, a, b)
+        a = itp(a)
+        b = itp(b)
+        return a >= b and a or b
     end)
 }):inherit(std.Poset)
 
-std.meet = lambda(_.o1, _.o2, object("meet", _.o1, _.o2))
+std.meet = lambda(_.a, _.b, object("meet", _.a, _.b))
 
 std.JoinSemilattice = typeclass("JoinSemilattice", {
-    join = CALLABLE:with_default(function(imp, itp, o1, o2)
-        o1 = itp(o1)
-        o2 = itp(o2)
-        return o1 >= o2 and o2 or o1
+    join = CALLABLE:with_default(function(imp, itp, a, b)
+        a = itp(a)
+        b = itp(b)
+        return a >= b and b or a
     end)
 }):inherit(std.Poset)
 
-std.join = lambda(_.o1, _.o2, object("join", _.o1, _.o2))
+std.join = lambda(_.a, _.b, object("join", _.a, _.b))
 
 std.Lattice = typeclass("Lattice")
     :inherit(std.MeetSemilattice, std.JoinSemilattice)
@@ -513,9 +579,9 @@ std.Real = typeclass("Real")
 
 std.Integral = typeclass("Integral", {
     __idiv = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) // itp(o2) end),
+        function(imp, itp, a, b) return itp(a) // itp(b) end),
     __mod = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) % itp(o2) end)
+        function(imp, itp, a, b) return itp(a) % itp(b) end)
 }):inherit(std.Real, std.Enum)
 
 std.Fractional = typeclass("Fractional")
@@ -523,7 +589,7 @@ std.Fractional = typeclass("Fractional")
 
 std.Floating = typeclass("Floating", {
     __pow = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) ^ itp(o2) end),
+        function(imp, itp, a, b) return itp(a) ^ itp(b) end),
     exp = CALLABLE, sqrt = CALLABLE, log = CALLABLE, log_base = CALLABLE,
     sin = CALLABLE, tan = CALLABLE, cos = CALLABLE, asin = CALLABLE,
     atan = CALLABLE, acos = CALLABLE, sinh = CALLABLE, tanh = CALLABLE,
@@ -553,9 +619,9 @@ std.Boolean = typeclass("Boolean", {
         function(imp, itp, value) return value end),
     
     and_ = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) and itp(o2) end),
+        function(imp, itp, a, b) return itp(a) and itp(b) end),
     or_ = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) or itp(o2) end)
+        function(imp, itp, a, b) return itp(a) or itp(b) end)
 })
 
 std.and_ = function(...) return chain("and_", ...) end
@@ -567,84 +633,75 @@ std.Binary = typeclass("Binary", {
     __bnot = CALLABLE:with_default(
         function(imp, itp, o) return ~itp(o) end),
     __band = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) & itp(o2) end),
+        function(imp, itp, a, b) return itp(a) & itp(b) end),
     __bor = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) | itp(o2) end),
+        function(imp, itp, a, b) return itp(a) | itp(b) end),
     __bxor = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) ~ itp(o2) end),
+        function(imp, itp, a, b) return itp(a) ~ itp(b) end),
 
     __shl = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) << itp(o2) end),
+        function(imp, itp, a, b) return itp(a) << itp(b) end),
     __shr = CALLABLE:with_default(
-        function(imp, itp, o1, o2) return itp(o1) >> itp(o2) end)
+        function(imp, itp, a, b) return itp(a) >> itp(b) end)
+})
+
+-- raw table
+
+std.ReadonlyTable = typeclass("RawTable", {
+    table = CALLABLE:with_default(function(imp, itp, t)
+        if getmetatable(t) then
+            error("readonly table should not have metatable")
+        end
+        return t
+    end),
+
+    __index = CALLABLE:with_default(
+        function(imp, itp, t, k) return itp(itp(t)[k]) end),
 })
 
 -- tuple
 
-local tuple = setmetatable({}, {
-    __call = function(self, name, ...)
-        guard.string("name", name)
-        return setmetatable({name, {...}}, self)
-    end
-})
-tuple.__index = tuple
-
-function tuple:to_typeclass()
-    local tc = self.typeclass
-    if not tc then
-        tc = typeclass(self[1], {
-            [self] = CALLABLE:with_default(
-                function(imp, itp, v) return v end)
-        })
-        self.typeclass = tc
-    end
-    return tc
-end
-
-function tuple:__tostring()
-    return self[1]
-end
-
-function tuple:__call(...)
-    return object("tuple_instance", self, ...)
-end
-
-function tuple:guard(itp, args)
-    local arg_types = self[2]
-    for i = 2, #arg_types do
-        local arg_t = pattern.from(itp(arg_types[i]))
-        if not arg_t then
-            error(("invalid tuple '%s': argument #%d has invalid type")
-                :format(self.name, i))
-        end
-        local arg = args[i - 1]
-        if not arg_t:match(arg) then
-            error(("failed to instantiate tuple '%s': invalid argument #%d (%s expected, got %s)")
-                :format(name, i, arg_t, pattern.from_instance(arg) or type(arg)))
-        end
-    end
-end
-
+local tuple = typeclass_family("Tuple")
 std.tuple = tuple
 
-std.Tuple = typeclass("Tuple", {
-    [tuple] = CALLABLE:with_default(
-        function(imp, itp, t) return t:to_typeclass() end),
-
-    tuple_instance = CALLABLE:with_default(function(imp, itp, t, ...)
-        local args = {...}
-        t:guard(itp, args)
-        return setmetatable(args, t)
-    end),
-}):inherit(std.Type)
-
-std.T = setmetatable({}, {
-    __index = function(self, name)
-        return function(...)
-            return tuple(name, ...)
-        end
-    end
+std.SpecializedTuple = typeclass("SpecializedTuple", {
+    table = CALLABLE
 })
+
+std.Tuple = typeclass("Tuple", {
+    [tuple] = CALLABLE:with_default(function(imp, itp, ...)
+        local arg_types = {...}
+        for i = 1, #arg_types do
+            local arg_t = itp(arg_types[i])
+            if getmetatable(arg_t) ~= typeclass then
+                error(("tuple component #%d has invalid type")
+                    :format(i))
+            end
+            arg_types[i] = arg_t
+        end
+        return imp.create_tuple_typeclasss(imp, itp, arg_types)
+    end),
+    
+    create_tuple_typeclasss = CALLABLE:with_default(function(imp, itp, arg_types)
+        return std.SpecializedTuple:instantiate("TupleInstance", {
+            table = function(imp, itp, args)
+                local t = {}
+                for i = 1, #arg_types do
+                    local arg = args[i]
+                    local arg_t = arg_types[i]
+                    local itps = arg_t:get_defaults()
+                    local succ, res = pcall(interpret, arg, itps)
+                    if not succ then
+                        error(("invalid tuple component #%d (%s expected, got %s)\n\t> %s")
+                            :format(i, arg_t, pattern.from_instance(arg) or type(arg), res))
+                    end
+                    t[i] = res
+                end
+                return t
+            end
+        })
+    end)
+}):inherit(std.TypeclassFamily)
 
 -- table
 
@@ -657,22 +714,8 @@ local table_mt = {
 }
 
 std.Table = typeclass("Table", {
-    table = CALLABLE:with_default(function(imp, itp, raw)
-        local mt = getmetatable(raw)
-        if mt == nil then
-            local t = {}
-            for k, v in pairs(raw) do
-                t[k] = v
-            end
-            return setmetatable(t, table_mt)
-        elseif mt == table_mt then
-            return raw
-        end
-        error("invalid table")
-    end),
-
-    __index = CALLABLE:with_default(
-        function(imp, itp, t, k) return itp(itp(t)[k]) end),
+    [table_mt] = CALLABLE:with_default(
+        function(imp, itp, t) return t end),
     
     table_update = CALLABLE:with_default(function(imp, itp, t, diff)
         local new = {}
@@ -686,7 +729,11 @@ std.Table = typeclass("Table", {
         end
         return setmetatable(new, table_mt)
     end)
-})
+}):inherit(std.ReadonlyTable)
+
+std.to_table = function(t)
+    return setmetatable(t, table_mt)
+end
 
 std.new_table = setmetatable({}, table_mt)
 

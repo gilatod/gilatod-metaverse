@@ -13,6 +13,7 @@
         "meido": "^1.0.0",
         "phale": "^1.0.0",
         "phale-std": "^1.0.0",
+        "phale-lua": "^1.0.0",
         "css-loader": "^6.2.0",
         "fengari-web": "^0.1.4",
         "howler": "^2.2.3",
