@@ -124,23 +124,13 @@ function typeclass:instantiate(name, arguments)
     guard.string("name", name)
 
     local child = typeclass(name)
-    local defaults = child.defaults
     child.parents[1] = self
 
     if arguments then
-        guard.table("arguments", arguments)
-        for k, v in pairs(arguments) do
-            local pat = find_pattern(self, k)
-            if pat then
-                if not pat:match(v) then
-                    error(("failed to instantiate %s (%s : %s expected, got %s)")
-                        :format(self, k, pat, type(v)), 2)
-                end
-                defaults[k] = v
-            end
-        end
+        child:provide(arguments)
     end
 
+    local defaults = child.defaults
     for_patterns(self, function(key, pat)
         if not defaults[key] and not pat:match(nil) then
             error(("failed to instantiate %s (%s : %s expected)")
@@ -151,6 +141,21 @@ function typeclass:instantiate(name, arguments)
     local children = self.children
     children[#children+1] = child
     return child
+end
+
+function typeclass:provide(arguments)
+    guard.table("arguments", arguments)
+    local defaults = self.defaults
+    for k, v in pairs(arguments) do
+        local pat = find_pattern(self, k)
+        if pat then
+            if not pat:match(v) then
+                error(("failed to instantiate %s (%s : %s expected, got %s)")
+                    :format(self, k, pat, type(v)), 2)
+            end
+            defaults[k] = v
+        end
+    end
 end
 
 function typeclass:inherit(...)

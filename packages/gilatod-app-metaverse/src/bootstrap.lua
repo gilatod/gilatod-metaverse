@@ -18,6 +18,9 @@ local function test_phale()
     
     local LuaTuple = typeclass("LuaTuple")
         :inherit(LuaExpression, Tuple)
+
+    local LuaRecord = typeclass("LuaRecord")
+        :inherit(LuaExpression, Record)
     
     local LuaTable = typeclass("LuaTable")
         :inherit(LuaExpression, Table)
@@ -29,7 +32,7 @@ local function test_phale()
         :inherit(LuaExpression, Boolean)
 
     local Lua = typeclass("lua")
-        :inherit(LuaNumber, LuaBoolean, LuaTuple, LuaTable)
+        :inherit(LuaNumber, LuaBoolean, LuaTuple, LuaRecord, LuaTable)
 
     local coll = {}
 
@@ -45,12 +48,12 @@ local function test_phale()
     local func = lambda(_.n ^ LuaNumber,
         cond | eq(1, _.n) >> LuaNumber
              | eq(2, _.n) >> LuaTable
-             | eq(3, _.n) >> tuple(LuaNumber, LuaNumber))
+             | eq(3, _.n) >> record { a = LuaNumber, b = LuaNumber })
 
     local t = new_table {a = 1, b = 2}
 
     Lua:match(
-        cases({1, 2})
+        cases({a = 1})
             | lambda(_.list ^ func(3), true) >> 1
             | lambda(ge(_, 1)) >> 10, coll)
 

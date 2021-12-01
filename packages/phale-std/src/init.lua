@@ -28,17 +28,6 @@ local function chain(tag, ...)
     return exp
 end
 
--- lift
-
-std.Lift = typeclass("Lift", {
-    lift = CALLABLE:with_default(
-        function(imp, itp, value) return itp(value) end)
-})
-
-std.lift = function(value)
-    return object("lift", value)
-end
-
 -- empty typeclass
 
 std.Empty = typeclass("Empty")
@@ -262,10 +251,16 @@ std.FixedPoint = typeclass("FixedPoint", {
     end)
 }):inherit(std.Function)
 
--- std.fix = lambda(_.f, object("fix", _.f))
-std.fix = function(f)
-    return object("fix", f)
-end
+std.fix = lambda(_.f, object("fix", _.f))
+
+-- lift
+
+std.Lift = typeclass("Lift", {
+    lift = CALLABLE:with_default(
+        function(imp, itp, value) return itp(value) end)
+})
+
+std.lift = lambda(_.v, object("lift", _.v))
 
 -- condition
 
@@ -661,15 +656,14 @@ std.ReadonlyTable = typeclass("RawTable", {
 
 -- tuple
 
-local tuple = typeclass_family("Tuple")
-std.tuple = tuple
+std.tuple = typeclass_family("Tuple")
 
 std.SpecializedTuple = typeclass("SpecializedTuple", {
     table = CALLABLE
 })
 
 std.Tuple = typeclass("Tuple", {
-    [tuple] = CALLABLE:with_default(function(imp, itp, ...)
+    [std.tuple] = CALLABLE:with_default(function(imp, itp, ...)
         local arg_types = {...}
         for i = 1, #arg_types do
             local arg_t = itp(arg_types[i])
@@ -702,6 +696,85 @@ std.Tuple = typeclass("Tuple", {
         })
     end)
 }):inherit(std.TypeclassFamily)
+
+-- record
+
+std.record = typeclass_family("Record")
+
+std.SpecializedRecord = typeclass("SpecializedRecord", {
+    table = CALLABLE
+})
+
+std.Record = typeclass("Record", {
+    [std.record] = CALLABLE:with_default(function(imp, itp, t)
+        local entry_types = {}
+        for k, v in pairs(t) do
+            local entry_t = itp(v)
+            if getmetatable(entry_t) ~= typeclass then
+                error(("record entry '%s' has invalid type")
+                    :format(k))
+            end
+            entry_types[k] = entry_t
+        end
+        return imp.create_record_typeclass(imp, itp, entry_types)
+    end),
+
+    create_record_typeclass = CALLABLE:with_default(function(imp, itp, entry_types)
+        return std.SpecializedRecord:instantiate("RecordInstance", {
+            table = function(imp, itp, entries)
+                local t = {}
+                for k, entry_t in pairs(entry_types) do
+                    local entry = entries[k]
+                    local itps = entry_t:get_defaults()
+                    local succ, res = pcall(interpret, entry, itps)
+                    if not succ then
+                        error(("invalid record entry '%s' (%s expected, got %s)\n\t> %s")
+                            :format(k, entry_t, pattern.from_instance(entry) or type(entry), res))
+                    end
+                    t[k] = res
+                end
+                return t
+            end
+        })
+    end)
+}):inherit(std.TypeclassFamily)
+
+-- Array
+
+std.array = typeclass_family("array")
+
+std.SpecializedArray = typeclass("SpecializedArray", {
+    table = CALLABLE
+})
+
+std.Array = typeclass("Array", {
+    [std.array] = CALLABLE:with_default(function(imp, itp, elem_t)
+        elem_t = itp(elem_t)
+        if getmetatable(elem_t) ~= typeclass then
+            error("invalid array element type")
+        end
+        return imp.create_array_typeclass(imp, itp, elem_t)
+    end),
+
+    create_array_typeclass = CALLABLE:with_default(function(imp, itp, elem_t)
+        return std.SpecializedArray:instantiate("ArrayInstance", {
+            table = function(imp, itp, elems)
+                local arr = {}
+                local itps = elem_t:get_defaults()
+                for i = 1, #elems do
+                    local elem = elems[i]
+                    local succ, res = pcall(interpret, elem, itps)
+                    if not succ then
+                        error(("invalid array element #%d (%s expected, got %s)\n\t> %s")
+                            :format(i, elem_t, pattern.from_instance(elem) or type(elem), res))
+                    end
+                    arr[i] = res
+                end
+                return arr
+            end
+        })
+    end)
+})
 
 -- table
 
