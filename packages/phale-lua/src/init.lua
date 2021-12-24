@@ -3,7 +3,7 @@ local pattern = require("meido.pattern")
 local tablex = require("meido.tablex")
 
 local object = require("phale.object")
-local typeclass = require("phale.typeclass")
+local class = require("phale.class")
 
 local std = require("phale-std")
 
@@ -14,8 +14,18 @@ local interpret = object.interpret
 
 local lua = {}
 
-lua.Source = typeclass("LuaSource", {
-    string = pattern.CALLABLE:with_default(
+local source_mt = {}
+
+local function src(...)
+    return setmetatable({...}, source_mt)
+end
+
+local function src_raw(t)
+    return setmetatable(t, source_mt)
+end
+
+lua.Source = class("LuaSource", {
+    [source_mt] = pattern.CALLABLE:with_default(
         function(imp, itp, s) return s end)
 })
 
@@ -23,7 +33,7 @@ lua.Core = std.Core:instantiate("LuaCore", {
     -- Condition
 
     if_ = function(imp, itp, o, true_branch, false_branch)
-        return "("..itp(o).." and "..itp(true_branch).." or "..itp(false_branch)..")"
+        return src("(", itp(o), " and ", itp(true_branch), " or ", itp(false_branch), ")")
     end,
 
     [cases_mt] = function(imp, itp, c)
@@ -38,7 +48,7 @@ lua.Core = std.Core:instantiate("LuaCore", {
             t[#t+1] = " or ("
         end
         t[#t] = string.rep(")", #c - 1)
-        return concat(t)
+        return src_raw(t)
     end,
 
     [cond_mt] = function(imp, itp, c)
@@ -52,19 +62,19 @@ lua.Core = std.Core:instantiate("LuaCore", {
             t[#t+1] = " or ("
         end
         t[#t] = string.rep(")", #c)
-        return concat(t)
+        return src_raw(t)
     end
 }):inherit(lua.Source)
 
 lua.Eq = std.Eq:instantiate("LuaEq", {
-    eq = function(imp, itp, a, b) return itp(a).."<="..itp(b) end,
+    eq = function(imp, itp, a, b) return src(itp(a), "<=", itp(b)) end,
 })
 lua.Show = std.Show:instantiate("LuaShow", {
-    show = function(imp, itp, o) return "tostring("..itp(o)"..)" end,
+    show = function(imp, itp, o) return src("tostring(", itp(o), "..)") end,
 })
 
 lua.Number = std.Real:instantiate("LuaNumber", {
-    number = function(imp, itp, value) return tostring(value) end,
+    number = function(imp, itp, value) return src(tostring(value)) end,
 
     unit = function(imp, itp) return "0" end,
     munit = function(imp, itp) return "1" end,
@@ -88,7 +98,7 @@ lua.Number = std.Real:instantiate("LuaNumber", {
     ge = function(imp, itp, a, b) return itp(a)..">="..itp(b) end,
 }):inherit(lua.Core, lua.Eq, lua.Show)
 
-lua.Language = typeclass("LuaLanguage")
+lua.Language = class("LuaLanguage")
     :inherit(lua.Core, lua.Number)
 
 return lua

@@ -12,32 +12,33 @@ local collect = pattern.collect
 
 local interpret = object.interpret
 
-local typeclass = {}
+local class = {}
 
-setmetatable(typeclass, {
-    __index = pattern.meta("phale.typeclass", typeclass),
-    __tostring = function() return "%phale.typeclass" end,
+setmetatable(class, {
+    __index = pattern.meta("phale.class", class),
+    __tostring = function() return "%phale.class" end,
     __call = function(self, name, pats)
         guard.string("name", name)
 
         local parents = {}
         local children = {}
         local patterns = {}
-        local raw_itps = {}
-        local defaults = setmetatable({}, {
+        local fields = setmetatable({}, {
             __index = function(t, k)
                 for i = #parents, 1, -1 do
-                    local v = parents[i].defaults[k]
+                    local v = parents[i].fields[k]
                     if v ~= nil then return v end
                 end
             end
         })
+        local cache = {}
 
         local instance = {
             parents = parents,
             children = children,
             patterns = patterns,
-            defaults = defaults
+            fields = fields,
+            cache = cache
         }
 
         local complete = true
@@ -49,7 +50,7 @@ setmetatable(typeclass, {
                     error(("invalid field for %s: %s")
                         :format(name, key))
                 elseif pat:has_default() then
-                    defaults[key] = pat:get_default()
+                    fields[key] = pat:get_default()
                 else
                     complete = false
                 end
@@ -59,18 +60,24 @@ setmetatable(typeclass, {
         instance.complete = complete
 
         instance.pattern = pattern(
-            "phale.typeclass", NO_DEFAULT,
+            "phale.class", NO_DEFAULT,
             function() return name end,
             function(v, c, s)
                 if not instance.complete then
-                    error(("typeclass %s is not complete"):format(name))
+                    error(("class %s is not complete"):format(name))
                 end
-                local res = interpret(v, defaults)
+                local res
+                local entry = cache[v]
+                if entry then
+                    res = entry[1]
+                else
+                    res = interpret(v, fields)
+                end
                 if c then c["@"] = res end
                 return true
             end)
 
-        function instance:get_defaults() return self.defaults end
+        function instance:get_fields() return self.fields end
         function instance:is_complete() return self.complete end
         function instance:to_pattern() return self.pattern end
         function instance:has_default() return false end
@@ -81,9 +88,9 @@ setmetatable(typeclass, {
         return setmetatable(instance, self)
     end
 })
-typeclass.__index = typeclass
+class.__index = class
 
-function typeclass:__tostring() return tostring(self.pattern) end
+function class:__tostring() return tostring(self.pattern) end
 
 local function for_patterns(tc, f)
     local parents = tc.parents
@@ -107,10 +114,10 @@ local function find_pattern(tc, key)
 end
 
 local function update_complete(tc)
-    local defaults = tc.defaults
+    local fields = tc.fields
     tc.complete = pcall(for_patterns, tc,
         function(key, pat)
-            if not defaults[key] and not pat:match(nil) then
+            if not fields[key] and not pat:match(nil) then
                 error()
             end
         end)
@@ -120,19 +127,19 @@ local function update_complete(tc)
     end
 end
 
-function typeclass:instantiate(name, arguments)
+function class:instantiate(name, arguments)
     guard.string("name", name)
 
-    local child = typeclass(name)
+    local child = class(name)
     child.parents[1] = self
 
     if arguments then
         child:provide(arguments)
     end
 
-    local defaults = child.defaults
+    local fields = child.fields
     for_patterns(self, function(key, pat)
-        if not defaults[key] and not pat:match(nil) then
+        if not fields[key] and not pat:match(nil) then
             error(("failed to instantiate %s (%s : %s expected)")
                 :format(self, key, pat), 5)
         end
@@ -143,9 +150,9 @@ function typeclass:instantiate(name, arguments)
     return child
 end
 
-function typeclass:provide(arguments)
+function class:provide(arguments)
     guard.table("arguments", arguments)
-    local defaults = self.defaults
+    local fields = self.fields
     for k, v in pairs(arguments) do
         local pat = find_pattern(self, k)
         if pat then
@@ -153,18 +160,18 @@ function typeclass:provide(arguments)
                 error(("failed to instantiate %s (%s : %s expected, got %s)")
                     :format(self, k, pat, type(v)), 2)
             end
-            defaults[k] = v
+            fields[k] = v
         end
     end
 end
 
-function typeclass:inherit(...)
+function class:inherit(...)
     local tcs = {...}
     local parents = self.parents
 
     for i = 1, select("#", ...) do
         local tc = tcs[i]
-        typeclass:guard("argument", tc, 3)
+        class:guard("argument", tc, 3)
         parents[#parents+1] = tc
         local children = tc.children
         children[#children+1] = self
@@ -174,4 +181,8 @@ function typeclass:inherit(...)
     return self
 end
 
-return typeclass
+function class:clear_cache()
+    self.cache = {}
+end
+
+return class

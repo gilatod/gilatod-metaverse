@@ -3,7 +3,7 @@ local meta = require("meido.meta")
 local tablex = require("meido.tablex")
 local pattern = require("meido.pattern")
 
-local typeclass = require("phale.typeclass")
+local class = require("phale.class")
 local object = require("phale.object")
 local effect = require("phale.effect")
 
@@ -13,51 +13,51 @@ for k, v in pairs(std) do _G[k] = v end
 local lua = require("phale-lua")
 
 local function test_phale()
-    local LuaExpression = typeclass("LuaExpression")
-        :inherit(Core)
+    local LuaExpression = class("LuaExpression")
+        :inherit(Core, FixedPoint, ClassFamily)
     
-    local LuaTuple = typeclass("LuaTuple")
-        :inherit(LuaExpression, Tuple)
+    local LuaTuple = class("LuaTuple")
+        :inherit(LuaExpression, FTuple)
 
-    local LuaRecord = typeclass("LuaRecord")
-        :inherit(LuaExpression, Record)
+    local LuaRecord = class("LuaRecord")
+        :inherit(LuaExpression, FRecord)
     
-    local LuaTable = typeclass("LuaTable")
+    local LuaTable = class("LuaTable")
         :inherit(LuaExpression, Table)
 
-    local LuaNumber = typeclass("LuaNumber")
+    local LuaNumber = class("LuaNumber")
         :inherit(LuaExpression, Real)
     
-    local LuaBoolean = typeclass("LuaBoolean")
+    local LuaBoolean = class("LuaBoolean")
         :inherit(LuaExpression, Boolean)
 
-    local Lua = typeclass("lua")
+    local Lua = class("lua")
         :inherit(LuaNumber, LuaBoolean, LuaTuple, LuaRecord, LuaTable)
 
-    local coll = {}
+    local function run(obj)
+        local coll = {}
+        Lua:match(obj, coll)
+        print(tablex.show(coll['@']))
+    end
 
     local test =
         fix(lambda(_.rec ^ Function, _.n ^ LuaNumber,
             if_(lt(_.n, 5),
                 1 + _.rec(_.n + 1),
                 1)))
-
-    Lua:match(test(0), coll)
-    print(tablex.show(coll['@']))
+    run(test(0))
 
     local func = lambda(_.n ^ LuaNumber,
-        cond | eq(1, _.n) >> LuaNumber
-             | eq(2, _.n) >> LuaTable
-             | eq(3, _.n) >> record { a = LuaNumber, b = LuaNumber })
+        cases(_.n)
+             | eq(1) >> LuaNumber
+             | eq(2) >> LuaTable
+             | eq(3) >> Tuple(LuaNumber, LuaNumber))
 
-    local t = new_table {a = 1, b = 2}
-
-    Lua:match(
-        cases({a = 1})
+    local exp =
+        cases({1, 2})
             | lambda(_.list ^ func(3), true) >> 1
-            | lambda(ge(_, 1)) >> 10, coll)
-
-    print(tablex.show(coll['@']))
+            | otherwise >> 0
+    run(exp)
 end
 
 local function test_lua()
